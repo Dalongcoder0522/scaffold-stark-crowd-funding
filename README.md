@@ -1,213 +1,65 @@
-# 🏗 Scaffold-Stark
+# Crowdfunding Contract (StarkNet)
 
-<h4 align="center">
-  <a href="https://docs.scaffoldstark.com/">Documentation</a> |
-  <a href="https://scaffoldstark.com/">Website</a> |
-  <a href="https://scaffold-stark-demo.vercel.app/debug">Demo</a>
-</h4>
+This StarkNet contract implements a crowdfunding mechanism where users can contribute to a campaign with any ERC20 tokens(contract addresss is needed to pass to the contract). Funds are withdrawn to a designated grantee address once the target amount is reached or the campaign deadline is passed.
 
-🧪 An open-source, up-to-date toolkit for building decentralized applications (dapps) on Starknet blockchain. It's designed to make it easier for developers to create and deploy smart contracts and build user interfaces that interact with those contracts.
+## Features
 
-⚙️ Built using NextJS, Starknet.js, Scarb, Starknet-React, Starknet Foundry and Typescript.
+*   Users can donate ERC20 tokens to the contract.
+*   Contract owner can withdraw funds to the grantee address.
+*   Contract owner can reset the contract for a new campaign (after target is met or deadline passes and all funds are withdrawn).
+*   Supports any ERC20 token on starknet(default STRK)
 
-- ✅ **Contract Fast Reload**: Your frontend auto-adapts to your smart contracts as you deploy them.
-- 🪝 [**Custom hooks**](https://docs.scaffoldstark.com/hooks/): Collection of React hooks wrapper around [starknet-react](https://starknet-react.com/) to simplify interactions with smart contracts with typescript autocompletion.
-- 🧱 [**Components**](https://docs.scaffoldstark.com/components): Collection of common web3 components to quickly build your frontend.
-- 🔥 **Burner Wallet & Prefunded Account**: Quickly test your application with a burner wallet and prefunded accounts.
-- 🔐 **Integration with Wallet Providers**: Connect to different wallet providers and interact with Starknet network.
+## Usage
 
-![Debug Contracts tab](./packages/nextjs/public/debug-image.png)
+1.  Deploy the contract with the desired campaign details:
+    *   `token` (optional, defaults to STRK token address): Contract address of the ERC20 token used for funding.
+    *   `grantee_address`: Address of the beneficiary who will receive the raised funds.
+    *   `fund_target`: Target amount to raise in the crowdfunding campaign.
+    *   `fund_description`: Description of the campaign (English only).
+    *   `deadline`: Unix timestamp representing the campaign end date.
+    *   `initial_owner`: Address of the initial contract owner.
 
-## Requirements
+2.  Users can call the `fund_to_contract` function to donate STRK tokens to the contract.
 
-Before you begin, you need to install the following tools:
+3.  The contract owner can call the `withdraw_funds` function to withdraw all collected funds to the grantee address when the target is met or the deadline is reached.
 
-- [Node (>= v18.17)](https://nodejs.org/en/download/)
-- Yarn ([v1](https://classic.yarnpkg.com/en/docs/install/) or [v2+](https://yarnpkg.com/getting-started/install))
-- [Git](https://git-scm.com/downloads)
-- [Rust](https://rust-lang.org/tools/install)
-- [asdf](https://asdf-vm.com/guide/getting-started.html)
-- [Cairo 1.0 extension for VSCode](https://marketplace.visualstudio.com/items?itemName=starkware.cairo1)
+4.  After a successful campaign or withdrawal, the contract owner can call the `reset_fund` function to set up a new campaign with different details. This requires the previous campaign to be completed (target met or deadline passed) and all funds withdrawn.
 
-### Starknet-devnet version
+## Interface
 
-To ensure the proper functioning of scaffold-stark, your local `starknet-devnet` version must be `0.2.3`. To accomplish this, first check your local starknet-devnet version:
+The contract implements the `IFund` interface which defines the following functions:
 
-```sh
-starknet-devnet --version
-```
+*   `get_fund_balance`: Returns the current balance of the contract in STRK tokens.
+*   `get_fund_target`: Returns the target funding amount for the campaign.
+*   `get_fund_description`: Returns the description of the crowdfunding campaign.
+*   `get_deadline`: Returns the Unix timestamp for the campaign deadline.
+*   `fund_to_contract`: Allows users to donate STRK tokens to the contract.
+*   `withdraw_funds`: Allows the contract owner to withdraw all collected funds to the grantee address.
+*   `reset_fund`: Allows the contract owner to reset the contract for a new campaign.
 
-If your local starknet-devnet version is not `0.2.3`, you need to install it.
+## Events
 
-- Install Starknet-devnet `0.2.3` via `asdf` ([instructions](https://github.com/gianalarcon/asdf-starknet-devnet/blob/main/README.md)).
+The contract emits several events:
 
-### Scarb version
+*   `OwnableEvent`: Events related to contract ownership management (inherited from OwnableComponent).
+*   `SelfDestructed`: Emitted when the contract is self-destructed, indicating the recipient address and remaining funds.
+*   `Transfer`: Emitted when a successful token transfer occurs (e.g., user donation).
+*   `TransferFailed`: Emitted when a token transfer fails.
+*   `ResetFund`: Emitted when the contract is reset for a new campaign, including details of the new campaign.
 
-To ensure the proper functioning of scaffold-stark, your local `Scarb` version must be `2.9.2`. To accomplish this, first check your local Scarb version:
+## Dependencies
 
-```sh
-scarb --version
-```
+*   OpenZeppelin Ownable: Provides ownership management functionality.
+*   OpenZeppelin ERC20: Provides interaction with ERC20 tokens.
 
-If your local Scarb version is not `2.9.2`, you need to install it.
-
-- Install Scarb `2.9.2` via `asdf` ([instructions](https://docs.swmansion.com/scarb/download.html#install-via-asdf)).
-
-### Starknet Foundry version
-
-To ensure the proper functioning of the tests on scaffold-stark, your Starknet Foundry version must be 0.31.0. To accomplish this, first check your Starknet Foundry version:
-
-```sh
-snforge --version
-```
-
-If your Starknet Foundry version is not `0.34.0`, you need to install it.
-
-- Install Starknet Foundry `0.34.0` via `asdf` ([instructions](https://foundry-rs.github.io/starknet-foundry/getting-started/installation.html#installation-via-asdf)).
-
-## Compatible versions
-
-- Starknet-devnet - v0.2.3
-- Scarb - v2.9.2
-- Snforge - v0.34.0
-- Cairo - v2.9.2
-- Rpc - v0.7.1
-
-## Quickstart with Starknet-Devnet
-
-To get started with Scaffold-Stark, follow the steps below:
-
-1. Clone this repo and install dependencies
+## Deployment and Interaction (Example using starkli)
 
 ```bash
-git clone https://github.com/Scaffold-Stark/scaffold-stark-2.git
-cd scaffold-stark-2
-yarn install
-```
+# Compile the contract
+cd packages/snfoundry/contracts
+scarb build
+# Run the contract test
+scarb test
 
-2. Run a local network in the first terminal.
-
-```bash
-yarn chain
-```
-
-> To run a fork : `yarn chain --fork-network <URL> [--fork-block <BLOCK_NUMBER>]`
-
-This command starts a local Starknet network using Devnet. The network runs on your local machine and can be used for testing and development. You can customize the network configuration in `scaffold.config.ts` for your nextjs app.
-
-3. On a second terminal, deploy the sample contract:
-
-```bash
-yarn deploy
-```
-
-This command deploys a sample smart contract to the local network. The contract is located in `packages/snfoundry/contracts/src` and can be modified to suit your needs. The `yarn deploy` command uses the deploy script located in `packages/snfoundry/scripts-ts/deploy.ts` to deploy the contract to the network. You can also customize the deploy script.
-
-By default `Scaffold-Stark` takes the first prefunded account from `starknet-devnet` as a deployer address,
-
-4. On a third terminal, start your NextJS app:
-
-```bash
-yarn start
-```
-
-Visit your app on: `http://localhost:3000`. You can interact with your smart contract using the `Debug Contracts` page. You can tweak the app config in `packages/nextjs/scaffold.config.ts`.
-
-5. Check your environment variables. We have a yarn postinstall script that helps to fill in your environment variables. If the environment variable does not exist, you can fill them it manually to get the app running!
-
-## Quickstart with Sepolia Testnet
-
-<details>
-
-1. Make sure you alredy cloned this repo and installed dependencies.
-
-2. Prepare your environment variables.
-
-Find the `packages/snfoundry/.env` file and fill the env variables related to Sepolia testnet with your own wallet account contract address and private key.
-
-3. Change your default network to Sepolia testnet.
-
-Find the `packages/nextjs/scaffold.config.ts` file and change the `targetNetworks` to `[chains.sepolia]`.
-
-![chall-0-scaffold-config](./packages/nextjs/public/scaffold-config.png)
-
-4. Get some testnet tokens.
-
-You will need to get some `ETH` or `STRK` Sepolia tokens to deploy your contract to Sepolia testnet.
-
-> Some popular faucets are [Starknet Faucet](https://starknet-faucet.vercel.app/) and [Blastapi Starknet Sepolia Eth](https://blastapi.io/faucets/starknet-sepolia-eth)
-
-4. Open a terminal, deploy the sample contract to Sepolia testnet:
-
-```bash
-yarn deploy --network sepolia
-```
-
-5. On a second terminal, start your NextJS app:
-
-```bash
-yarn start
-```
-
-Visit your app on: `http://localhost:3000`. You can interact with your smart contract using the `Debug Contracts` page. You can tweak the app config in `packages/nextjs/scaffold.config.ts`.
-
-### RPC specific version
-
-To ensure the proper functioning of the scaffold-stark with Testnet or Mainnet, your RPC version must be `0.7.1`. This repository contains a `.env.example` file, where we provided the default RPC URL for the Starknet Testnet: `RPC_URL_SEPOLIA=https://starknet-sepolia.public.blastapi.io/rpc/v0_7`. Let's verify this RPC version is `0.7.1` by calling a `POST` request in an API platform like `Postman` or `Insommia` . Your API endpoint should be `https://starknet-sepolia.public.blastapi.io/rpc/v0_7` and the body should be:
-
-```json
-{
- "jsonrpc":"2.0",
- "method":"starknet_specVersion",
- "id":1
-}
-```
-
-You have to paste the endpoint and body in the API platform and click on the `Send` button. If the response is `0.7.1`, then you are good to go. Otherwise, you have to get the correct RPC URL endpoint.
-
-![rpc-version](./packages/nextjs/public/rpc-version.png)
-</details>
-
-## **What's next**
-
-- Edit your smart contract `YourContract.cairo` in `packages/snfoundry/contracts/src`
-- Edit your frontend homepage at `packages/nextjs/app/page.tsx`. For guidance on [routing](https://nextjs.org/docs/app/building-your-application/routing/defining-routes) and configuring [pages/layouts](https://nextjs.org/docs/app/building-your-application/routing/pages-and-layouts) checkout the Next.js documentation.
-- Edit your deployment scripts in `packages/snfoundry/script-ts/deploy.ts`
-- Edit your smart contract tests in `packages/snfoundry/contracts/src/test`. To run tests use `yarn test`
-- You can write unit tests for your Next.js app! Run them with one the following scripts below.
-  - `yarn test:nextjs` to run regular tests with watch mode
-  - `yarn test:nextjs run` to run regular tests without watch mode
-  - `yarn test:nextjs run --coverage` to run regular tests without watch mode with coverage
-
-## Documentation
-
-Visit our [docs](https://docs.scaffoldstark.com/) to learn how to start building with Scaffold-Stark.
-
-To know more about its features, check out our [website](https://scaffoldstark.com)
-
-#### External Image Source Configuration
-
-In the `next.config.mjs`, we've set up external image sources using `remotePatterns` to allow fetching assets from specific domains. This is particularly useful for loading images or assets from external servers or services.
-
-```javascript
-remotePatterns: [
-  // External image source for StarkNet ID identicons
-  {
-    protocol: "https",
-    hostname: "identicon.starknet.id",
-    pathname: "/**", // Allows all paths under this domain
-  },
-  // External image source for images hosted on Starkurabu
-  {
-    protocol: "https",
-    hostname: "img.starkurabu.com",
-    pathname: "/**",
-  },
-],
-```
-
-## Contributing to Scaffold-Stark
-
-We welcome contributions to Scaffold-Stark!
-
-Please see [CONTRIBUTING.MD](https://github.com/Scaffold-Stark/scaffold-stark-2/blob/main/CONTRIBUTING.md) for more information and guidelines for contributing to Scaffold-Stark.
+# Deploy the contract 
+yarn deploy --network {NETWORK_NAME} //"sepolia" or "mainnet", defaults to "devnet"

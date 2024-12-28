@@ -43,9 +43,14 @@ import { green } from "./helpers/colorize-log";
  */
 const deployScript = async (): Promise<void> => {
   await deployContract({
-    contract: "YourContract",
+    contract: "crowdfunding",
     constructorArgs: {
-      owner: deployer.address,
+      token: process.env.STRK_SEPOLIA_ADDRESS ?? "",
+      grantee_address: process.env.GRANTEE_ADDRESS ?? "",
+      fund_target: process.env.FUND_TARGET ?? "",
+      fund_description: process.env.FUND_DESCRIPTION ?? "",
+      deadline: process.env.DEADLINE ?? "",
+      initial_owner: process.env.ACCOUNT_ADDRESS_SEPOLIA ?? "",
     },
   });
 };

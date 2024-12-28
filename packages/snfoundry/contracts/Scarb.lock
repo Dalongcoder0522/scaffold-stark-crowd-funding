@@ -2,7 +2,7 @@
 version = 1
 
 [[package]]
-name = "contracts"
+name = "crowdfunding"
 version = "0.2.0"
 dependencies = [
  "openzeppelin_access",

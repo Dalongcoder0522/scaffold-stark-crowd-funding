@@ -1,5 +1,5 @@
-mod YourContract;
+mod crowdfunding;
 #[cfg(test)]
 mod test {
-    mod TestContract;
+    mod crowdfunding_test;
 }
