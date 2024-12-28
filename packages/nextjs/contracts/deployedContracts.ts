@@ -3,6 +3,413 @@
  * You should not edit it manually or your changes might be overwritten.
  */
 
-const deployedContracts = {} as const;
+const deployedContracts = {
+  devnet: {
+    crowdfunding: {
+      address:
+        "0x61dcb589b02ae90d30e3eb8f6c7f8b66399289b9fff7fcc0a20c13e5242ea92",
+      abi: [
+        {
+          type: "impl",
+          name: "CrowdFundingImpl",
+          interface_name: "crowdfunding::crowdfunding::IFund",
+        },
+        {
+          type: "struct",
+          name: "core::integer::u256",
+          members: [
+            {
+              name: "low",
+              type: "core::integer::u128",
+            },
+            {
+              name: "high",
+              type: "core::integer::u128",
+            },
+          ],
+        },
+        {
+          type: "interface",
+          name: "crowdfunding::crowdfunding::IFund",
+          items: [
+            {
+              type: "function",
+              name: "get_fund_balance",
+              inputs: [],
+              outputs: [
+                {
+                  type: "core::integer::u256",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
+              name: "get_fund_target",
+              inputs: [],
+              outputs: [
+                {
+                  type: "core::integer::u256",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
+              name: "get_fund_description",
+              inputs: [],
+              outputs: [
+                {
+                  type: "core::felt252",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
+              name: "get_deadline",
+              inputs: [],
+              outputs: [
+                {
+                  type: "core::felt252",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
+              name: "fund_to_contract",
+              inputs: [
+                {
+                  name: "amount",
+                  type: "core::integer::u256",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "withdraw_funds",
+              inputs: [],
+              outputs: [],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "reset_fund",
+              inputs: [
+                {
+                  name: "token",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+                {
+                  name: "grantee_address",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+                {
+                  name: "fund_target",
+                  type: "core::integer::u256",
+                },
+                {
+                  name: "fund_description",
+                  type: "core::felt252",
+                },
+                {
+                  name: "deadline",
+                  type: "core::felt252",
+                },
+                {
+                  name: "initial_owner",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
+          ],
+        },
+        {
+          type: "impl",
+          name: "OwnableMixinImpl",
+          interface_name: "openzeppelin_access::ownable::interface::OwnableABI",
+        },
+        {
+          type: "interface",
+          name: "openzeppelin_access::ownable::interface::OwnableABI",
+          items: [
+            {
+              type: "function",
+              name: "owner",
+              inputs: [],
+              outputs: [
+                {
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
+              name: "transfer_ownership",
+              inputs: [
+                {
+                  name: "new_owner",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "renounce_ownership",
+              inputs: [],
+              outputs: [],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "transferOwnership",
+              inputs: [
+                {
+                  name: "newOwner",
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "renounceOwnership",
+              inputs: [],
+              outputs: [],
+              state_mutability: "external",
+            },
+          ],
+        },
+        {
+          type: "constructor",
+          name: "constructor",
+          inputs: [
+            {
+              name: "token",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "grantee_address",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+            {
+              name: "fund_target",
+              type: "core::integer::u256",
+            },
+            {
+              name: "fund_description",
+              type: "core::felt252",
+            },
+            {
+              name: "deadline",
+              type: "core::felt252",
+            },
+            {
+              name: "initial_owner",
+              type: "core::starknet::contract_address::ContractAddress",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "openzeppelin_access::ownable::ownable::OwnableComponent::OwnershipTransferred",
+          kind: "struct",
+          members: [
+            {
+              name: "previous_owner",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "key",
+            },
+            {
+              name: "new_owner",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "key",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "openzeppelin_access::ownable::ownable::OwnableComponent::OwnershipTransferStarted",
+          kind: "struct",
+          members: [
+            {
+              name: "previous_owner",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "key",
+            },
+            {
+              name: "new_owner",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "key",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "openzeppelin_access::ownable::ownable::OwnableComponent::Event",
+          kind: "enum",
+          variants: [
+            {
+              name: "OwnershipTransferred",
+              type: "openzeppelin_access::ownable::ownable::OwnableComponent::OwnershipTransferred",
+              kind: "nested",
+            },
+            {
+              name: "OwnershipTransferStarted",
+              type: "openzeppelin_access::ownable::ownable::OwnableComponent::OwnershipTransferStarted",
+              kind: "nested",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "crowdfunding::crowdfunding::crowdfunding::SelfDestructed",
+          kind: "struct",
+          members: [
+            {
+              name: "recipient",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "data",
+            },
+            {
+              name: "amount",
+              type: "core::integer::u256",
+              kind: "data",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "crowdfunding::crowdfunding::crowdfunding::Transfer",
+          kind: "struct",
+          members: [
+            {
+              name: "from",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "data",
+            },
+            {
+              name: "to",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "data",
+            },
+            {
+              name: "amount",
+              type: "core::integer::u256",
+              kind: "data",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "crowdfunding::crowdfunding::crowdfunding::TransferFailed",
+          kind: "struct",
+          members: [
+            {
+              name: "from",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "data",
+            },
+            {
+              name: "to",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "data",
+            },
+            {
+              name: "amount",
+              type: "core::integer::u256",
+              kind: "data",
+            },
+            {
+              name: "error_message",
+              type: "core::felt252",
+              kind: "data",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "crowdfunding::crowdfunding::crowdfunding::ResetFund",
+          kind: "struct",
+          members: [
+            {
+              name: "token",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "data",
+            },
+            {
+              name: "grantee_address",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "data",
+            },
+            {
+              name: "fund_target",
+              type: "core::integer::u256",
+              kind: "data",
+            },
+            {
+              name: "fund_description",
+              type: "core::felt252",
+              kind: "data",
+            },
+            {
+              name: "deadline",
+              type: "core::felt252",
+              kind: "data",
+            },
+            {
+              name: "initial_owner",
+              type: "core::starknet::contract_address::ContractAddress",
+              kind: "data",
+            },
+          ],
+        },
+        {
+          type: "event",
+          name: "crowdfunding::crowdfunding::crowdfunding::Event",
+          kind: "enum",
+          variants: [
+            {
+              name: "OwnableEvent",
+              type: "openzeppelin_access::ownable::ownable::OwnableComponent::Event",
+              kind: "flat",
+            },
+            {
+              name: "SelfDestructed",
+              type: "crowdfunding::crowdfunding::crowdfunding::SelfDestructed",
+              kind: "nested",
+            },
+            {
+              name: "Transfer",
+              type: "crowdfunding::crowdfunding::crowdfunding::Transfer",
+              kind: "nested",
+            },
+            {
+              name: "TransferFailed",
+              type: "crowdfunding::crowdfunding::crowdfunding::TransferFailed",
+              kind: "nested",
+            },
+            {
+              name: "ResetFund",
+              type: "crowdfunding::crowdfunding::crowdfunding::ResetFund",
+              kind: "nested",
+            },
+          ],
+        },
+      ],
+      classHash:
+        "0x4167cfbd552a082c96efb1c1e954157150cb994aeeae719880c36e640bafd10",
+    },
+  },
+} as const;
 
 export default deployedContracts;

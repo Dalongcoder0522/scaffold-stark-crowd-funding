@@ -33,12 +33,12 @@ const getContractDataFromDeployments = (): Record<
         }
       > = JSON.parse(fs.readFileSync(filePath, "utf8"));
       const chainId = path.basename(file, "_latest.json");
-
+console.log('3333',chainId);
       Object.entries(content).forEach(([contractName, contractData]) => {
         try {
           const abiFilePath = path.join(
             __dirname,
-            `../../contracts/target/dev/contracts_${contractData.contract}.contract_class.json`
+            `../../contracts/target/dev/${contractData.contract}_${contractData.contract}.contract_class.json`
           );
           const abiContent: CompiledSierra = JSON.parse(
             fs.readFileSync(abiFilePath, "utf8")
@@ -62,7 +62,6 @@ const getContractDataFromDeployments = (): Record<
 
 const generateTsAbis = () => {
   const allContractsData = getContractDataFromDeployments();
-
   const fileContent = Object.entries(allContractsData).reduce(
     (content, [chainId, chainConfig]) => {
       // Use chainId directly as it is already a hex string
