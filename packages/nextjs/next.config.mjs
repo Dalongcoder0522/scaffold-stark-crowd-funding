@@ -24,8 +24,43 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: process.env.NEXT_PUBLIC_IGNORE_BUILD_ERROR === "true",
   },
-  webpack: (config) => {
-    config.resolve.fallback = { fs: false, net: false, tls: false };
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.fallback = {
+        fs: false,
+        net: false,
+        tls: false,
+        url: false,
+        crypto: false,
+        stream: false,
+        path: false,
+        http: false,
+        https: false,
+        zlib: false,
+        querystring: false,
+        buffer: false,
+      };
+
+      // Add a rule to handle node: protocol imports
+      config.module.rules.push({
+        test: /[\\/]node_modules[\\/]tough-cookie[\\/].*\.js$/,
+        use: {
+          loader: 'babel-loader',
+          options: {
+            presets: ['@babel/preset-env'],
+            plugins: [
+              ['module-resolver', {
+                alias: {
+                  'node:url': 'url',
+                  'node:punycode': 'punycode',
+                  'node:net': false,
+                }
+              }]
+            ]
+          }
+        }
+      });
+    }
     config.externals.push("pino-pretty", "lokijs", "encoding");
     return config;
   },
