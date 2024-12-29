@@ -7,7 +7,7 @@ const deployedContracts = {
   devnet: {
     crowdfunding: {
       address:
-        "0x61dcb589b02ae90d30e3eb8f6c7f8b66399289b9fff7fcc0a20c13e5242ea92",
+        "0x42003d00a6ffcedf86fd3c20dce67b32a6280ebe9acb7487943dea0b7d34914",
       abi: [
         {
           type: "impl",
@@ -407,7 +407,7 @@ const deployedContracts = {
         },
       ],
       classHash:
-        "0x4167cfbd552a082c96efb1c1e954157150cb994aeeae719880c36e640bafd10",
+        "0x29806b8ede3ed1a86eff7aae54486f361fdd619915e7eea8bb158b2b3e51aea",
     },
   },
 } as const;

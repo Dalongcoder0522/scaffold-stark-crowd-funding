@@ -41,6 +41,7 @@ pub mod crowdfunding {
     use starknet::get_caller_address;
     use openzeppelin_access::ownable::{OwnableComponent};
     use openzeppelin_token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
+    use core::traits::TryInto;
 
     // Ownable component integration
     component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);
@@ -129,8 +130,13 @@ pub mod crowdfunding {
     impl CrowdFundingImpl of super::IFund<ContractState> {
         // Allows users to donate STRK tokens to the contract
         fn fund_to_contract(ref self: ContractState, amount: u256) {
+            println!("amount: {}", amount);
             let caller_address = get_caller_address();
+            let caller_felt: felt252 = caller_address.try_into().unwrap();
+            println!("caller_address (hex): 0x{:x}", caller_felt);
+            
             let current_contract_address = starknet::get_contract_address();
+            let contract_felt: felt252 = current_contract_address.try_into().unwrap();
             
             // Validation checks
             assert(caller_address != current_contract_address, 'No self fund.');
@@ -138,25 +144,51 @@ pub mod crowdfunding {
             
             // Check if campaign is still active
             let current_timestamp = starknet::get_block_timestamp();
+            println!("current_timestamp: {}", current_timestamp);
             let deadline: u64 = self.deadline.read().try_into().unwrap();
+            println!("deadline: {}", deadline);
             assert(current_timestamp <= deadline, 'Campaign has ended');
             
             let token_dispatcher = IERC20Dispatcher { contract_address: self.token.read() };
-            let caller_address = starknet::get_caller_address();
-
-            let transfer_successful = token_dispatcher.transfer_from(
-                caller_address, current_contract_address, amount
+            println!("contract_address (hex): 0x{:x}", contract_felt);
+            
+            // 检查余额
+            let balance = token_dispatcher.balance_of(caller_address);
+            println!("caller balance: {}", balance);
+            assert(balance >= amount, 'Insufficient balance');
+            
+            // 检查授权额度
+            let allowance = token_dispatcher.allowance(caller_address, current_contract_address);
+            println!("allowance: {}", allowance);
+            assert(allowance >= amount, 'Insufficient allowance');
+            
+            // 执行转账
+            println!("Attempting transfer from 0x{:x} to 0x{:x} amount {}", 
+                caller_felt,
+                contract_felt,
+                amount
             );
-
-            if transfer_successful {
-                self.emit(Transfer { from: caller_address,to: current_contract_address, amount: amount });
-            } else {
-                self.emit(TransferFailed {
-                    from: caller_address,
-                    to: current_contract_address,
-                    amount: amount,
-                    error_message: 'Failed to transfer!'
-                });
+            
+            // Check allowance before transfer
+            let allowance = token_dispatcher.allowance(caller_address, current_contract_address);
+            println!("Contract allowance: {}", allowance);
+            
+            match token_dispatcher.transfer_from(
+                caller_address, current_contract_address, amount
+            ) {
+                true => {
+                    println!("Transfer successful!");
+                    self.emit(Transfer { from: caller_address, to: current_contract_address, amount: amount });
+                },
+                false => {
+                    println!("Transfer failed!");
+                    self.emit(TransferFailed {
+                        from: caller_address,
+                        to: current_contract_address,
+                        amount: amount,
+                        error_message: 'Failed to transfer!'
+                    });
+                }
             }
         }
 
@@ -164,31 +196,51 @@ pub mod crowdfunding {
         // Can only be called by contract owner when deadline is reached or target is met
         fn withdraw_funds(ref self: ContractState) {
             self.ownable.assert_only_owner();
-            
+            println!("in:in" );
             // Check if deadline has passed or target is met
             let token_dispatcher = IERC20Dispatcher { contract_address: self.token.read() };
             let current_timestamp = starknet::get_block_timestamp();
             let deadline: u64 = self.deadline.read().try_into().unwrap();
             let current_contract_address = starknet::get_contract_address();
             let balance = token_dispatcher.balance_of(current_contract_address);
+            let target = self.fund_target.read();
+            
+            println!("current_timestamp: {}", current_timestamp);
+            println!("deadline: {}", deadline);
+            println!("fund_target raw: {}", target);
+            println!("fund_target from getter: {}", self.get_fund_target());
+            println!("balance: {}", balance);
+
             assert(
-                current_timestamp > deadline || balance >= self.fund_target.read(),
+                current_timestamp > deadline || balance >= target,
                 'Cannot withdraw!'
             );
+
+            println!("Assert passed successfully");
+            let contract_felt: felt252 = current_contract_address.try_into().unwrap();
             let grantee_address = self.grantee_address.read();
-            let transfer_successful = token_dispatcher.transfer_from(
-                current_contract_address, grantee_address, balance
-            );
-        
-            if transfer_successful {
-                self.emit(Transfer { from: current_contract_address, to: grantee_address, amount: balance });
-            } else {
-                self.emit(TransferFailed {
-                    from: current_contract_address,
-                    to: grantee_address,
-                    amount: balance,
-                    error_message: 'Failed to withdraw!'
-                });
+            let grantee_address_felt: felt252 = grantee_address.try_into().unwrap();
+            
+            println!("Attempting transfer_from...");
+            println!("From address: (hex): 0x{:x}", contract_felt);
+            println!("To address: (hex): 0x{:x}", grantee_address_felt);
+            println!("Amount: {}", balance);
+            
+            println!("Attempting direct transfer...");
+            match token_dispatcher.transfer(grantee_address, balance) {
+                true => {
+                    println!("Transfer successful!");
+                    self.emit(Transfer { from: current_contract_address, to: grantee_address, amount: balance });
+                },
+                false => {
+                    println!("Transfer failed!");
+                    self.emit(TransferFailed {
+                        from: current_contract_address,
+                        to: grantee_address,
+                        amount: balance,
+                        error_message: 'Failed to withdraw!'
+                    });
+                }
             }
         }
 
@@ -225,16 +277,10 @@ pub mod crowdfunding {
             initial_owner: ContractAddress
         ) {
             self.ownable.assert_only_owner();
-            // Check if deadline has passed or target is met
+            // Reset contract after withdraw
             let token_dispatcher = IERC20Dispatcher { contract_address: self.token.read() };
-            let current_timestamp = starknet::get_block_timestamp();
-            let deadline_u64: u64 = self.deadline.read().try_into().unwrap();
             let current_contract_address = starknet::get_contract_address();
             let balance = token_dispatcher.balance_of(current_contract_address);
-            assert(
-                current_timestamp > deadline_u64 || balance >= self.fund_target.read(),
-                'Cannot reset!'
-            );
             assert(
                 balance <= 0,
                 'Please withdraw first!'

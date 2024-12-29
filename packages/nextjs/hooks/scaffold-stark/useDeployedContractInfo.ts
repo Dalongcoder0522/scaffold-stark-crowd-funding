@@ -18,6 +18,8 @@ export const useDeployedContractInfo = <TContractName extends ContractName>(
   const deployedContract = contracts?.[targetNetwork.network]?.[
     contractName as ContractName
   ] as Contract<TContractName>;
+  debugger;
+  console.log(contracts);
   const [status, setStatus] = useState<ContractCodeStatus>(
     ContractCodeStatus.LOADING,
   );
