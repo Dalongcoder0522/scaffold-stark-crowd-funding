@@ -48,7 +48,7 @@ export const ContractUI = ({
     isLoading: deployedContractLoading,
     status,
   } = useDeployedContractInfo(contractName);
-debugger;
+
 console.log('1111111111111');
   const tabs = [
     { id: "read", label: "Read" },

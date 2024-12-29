@@ -7,7 +7,7 @@ const deployedContracts = {
   devnet: {
     crowdfunding: {
       address:
-        "0x42003d00a6ffcedf86fd3c20dce67b32a6280ebe9acb7487943dea0b7d34914",
+        "0x2927e6052fca01e7a669c43e38cabadb696e916d3f1298986f46bc53f0a65",
       abi: [
         {
           type: "impl",
@@ -25,6 +25,24 @@ const deployedContracts = {
             {
               name: "high",
               type: "core::integer::u128",
+            },
+          ],
+        },
+        {
+          type: "struct",
+          name: "core::byte_array::ByteArray",
+          members: [
+            {
+              name: "data",
+              type: "core::array::Array::<core::bytes_31::bytes31>",
+            },
+            {
+              name: "pending_word",
+              type: "core::felt252",
+            },
+            {
+              name: "pending_word_len",
+              type: "core::integer::u32",
             },
           ],
         },
@@ -72,6 +90,28 @@ const deployedContracts = {
               outputs: [
                 {
                   type: "core::felt252",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
+              name: "get_token_symbol",
+              inputs: [],
+              outputs: [
+                {
+                  type: "core::byte_array::ByteArray",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
+              name: "get_token_address",
+              inputs: [],
+              outputs: [
+                {
+                  type: "core::starknet::contract_address::ContractAddress",
                 },
               ],
               state_mutability: "view",
@@ -407,7 +447,7 @@ const deployedContracts = {
         },
       ],
       classHash:
-        "0x29806b8ede3ed1a86eff7aae54486f361fdd619915e7eea8bb158b2b3e51aea",
+        "0x4e444fa1ce16ede9304869e53f00a9245703e813a7afa555a32566f6c793ace",
     },
   },
 } as const;

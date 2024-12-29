@@ -1,61 +1,373 @@
-import Link from "next/link";
-import Image from "next/image";
+'use client';
+
 import { ConnectedAddress } from "~~/components/ConnectedAddress";
+import { Balance, EtherInput, InputBase } from "~~/components/scaffold-stark";
+import { useState, useMemo } from "react";
+import { useScaffoldReadContract, useScaffoldWriteContract, useDeployedContractInfo } from "~~/hooks/scaffold-stark";
+import { useAccount } from "~~/hooks/useAccount";
+import GenericModal from "~~/components/scaffold-stark/CustomConnectButton/GenericModal";
+
+// 将 felt252 转换为字符串
+const feltToString = (felt: string) => {
+  const hex = BigInt(felt).toString(16);
+  const paddedHex = hex.length % 2 ? '0' + hex : hex;
+  const bytes = [];
+  for (let i = 0; i < paddedHex.length; i += 2) {
+    bytes.push(parseInt(paddedHex.slice(i, i + 2), 16));
+  }
+  return new TextDecoder().decode(new Uint8Array(bytes));
+};
+
+// 格式化 STRK 金额
+const formatSTRK = (amount: string | undefined, decimals: number = 18): string => {
+  if (!amount) return "0";
+  const value = BigInt(amount);
+  const divisor = BigInt(10 ** decimals);
+  const integerPart = value / divisor;
+  const fractionalPart = value % divisor;
+  
+  // 处理小数部分，去掉末尾的0
+  let fractionalStr = fractionalPart.toString().padStart(decimals, '0');
+  while (fractionalStr.endsWith('0') && fractionalStr.length > 0) {
+    fractionalStr = fractionalStr.slice(0, -1);
+  }
+  
+  return fractionalStr.length > 0 
+    ? `${integerPart}.${fractionalStr}`
+    : integerPart.toString();
+};
 
 const Home = () => {
+  const [sendValue, setSendValue] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pendingAmount, setPendingAmount] = useState<bigint | null>(null);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const { address } = useAccount();
+  
+  // 获取 crowdfunding 合约地址
+  const { data: crowdfundingContract } = useDeployedContractInfo("crowdfunding");
+
+  // 读取众筹描述
+  const { data: fundDescription, isLoading: isLoadingDescription } = useScaffoldReadContract({
+    contractName: "crowdfunding",
+    functionName: "get_fund_description",
+  });
+
+  // 获取合约余额
+  const { data: fundBalance, isLoading: isLoadingBalance } = useScaffoldReadContract({
+    contractName: "crowdfunding",
+    functionName: "get_fund_balance",
+  });
+
+  // 获取代币符号
+  const { data: tokenSymbol, isLoading: isLoadingSymbol } = useScaffoldReadContract({
+    contractName: "crowdfunding",
+    functionName: "get_token_symbol",
+  });
+
+  // 动态确定代币合约名称
+  const tokenContractName = useMemo(() => {
+    if (!tokenSymbol) return "Strk"; // 默认使用 STRK
+    const symbol = tokenSymbol.toString().toUpperCase();
+    if (symbol === "ETH") return "Eth";
+    if (symbol === "STRK") return "Strk";
+    return "Strk";
+  }, [tokenSymbol]) as "Eth" | "Strk";
+
+  // 获取目标金额
+  const { data: fundTarget, isLoading: isLoadingTarget } = useScaffoldReadContract({
+    contractName: "crowdfunding",
+    functionName: "get_fund_target",
+  });
+
+  // 获取截止时间
+  const { data: deadline } = useScaffoldReadContract({
+    contractName: "crowdfunding",
+    functionName: "get_deadline",
+  });
+
+  // ERC20 approve
+  const { sendAsync: approveToken, isPending: isApproving } = useScaffoldWriteContract({
+    contractName: tokenContractName,
+    functionName: "approve",
+    args: crowdfundingContract?.address ? [crowdfundingContract.address, 0n] as const : undefined
+  });
+
+  // 捐赠功能
+  const { sendAsync: fundToContract, isPending: isWriteLoading } = useScaffoldWriteContract({
+    contractName: "crowdfunding",
+    functionName: "fund_to_contract",
+    args: [0n] as const
+  });
+
+  // 转换描述为可读字符串
+  const description = fundDescription ? feltToString(fundDescription.toString()) : "Loading...";
+  
+  // 处理代币符号
+  const symbol = useMemo(() => {
+    if (!tokenSymbol) return "STRK";
+    try {
+      return tokenSymbol.toString().toUpperCase();
+    } catch (error) {
+      console.error("Error parsing token symbol:", error);
+      return "STRK";
+    }
+  }, [tokenSymbol]);
+
+  // 计算进度
+  const progress = fundBalance && fundTarget ?
+    (Number(fundBalance.toString()) / Number(fundTarget.toString())) * 100 : 0;
+
+  // 格式化截止时间
+  const formatDeadline = (timestamp: string) => {
+    if (!timestamp) return "Loading...";
+    const date = new Date(Number(timestamp) * 1000);
+    return date.toLocaleDateString() + " " + date.toLocaleTimeString();
+  };
+
+  // 使用 useMemo 缓存加载状态
+  const isPageLoading = useMemo(() => {
+    // 只在初始加载时显示加载状态
+    if (!crowdfundingContract) return true;
+    
+    // 如果已经有数据，即使在加载中也不显示加载状态
+    if (fundDescription || fundBalance || tokenSymbol || fundTarget) return false;
+    
+    // 否则根据加载状态判断
+    return isLoadingDescription || isLoadingBalance || isLoadingTarget || isLoadingSymbol;
+  }, [
+    crowdfundingContract,
+    fundDescription,
+    fundBalance,
+    tokenSymbol,
+    fundTarget,
+    isLoadingDescription,
+    isLoadingBalance,
+    isLoadingTarget,
+    isLoadingSymbol
+  ]);
+
+  // 处理捐赠
+  const handleDonate = async () => {
+    try {
+      setError(null);
+      setIsLoading(true);
+      
+      // 输入验证
+      if (!sendValue) {
+        setError("Please enter an amount");
+        return;
+      }
+
+      // 检查钱包连接
+      if (!address) {
+        setError("Please connect your wallet first");
+        return;
+      }
+
+      // 检查合约地址
+      if (!crowdfundingContract?.address) {
+        setError("Contract not deployed");
+        return;
+      }
+
+      // 数值验证
+      const parsedAmount = BigInt(sendValue);
+      if (parsedAmount <= 0n) {
+        setError("Amount must be greater than 0");
+        return;
+      }
+
+      // 转换为完整的 STRK (乘以 10^18)
+      const amount = parsedAmount * 10n ** 18n;
+      console.log("Converting to STRK:", {
+        input: sendValue,
+        converted: amount.toString()
+      });
+
+      // 这里modal dialog提示用户确认捐赠金额
+      if (fundTarget) {
+        setPendingAmount(amount);
+        setShowConfirmDialog(true);
+        return;
+      }
+
+      // 先调用 approve
+      console.log("Approving token...");
+      try {
+        const approveTx = await approveToken({
+          args: [crowdfundingContract.address, amount]
+        });
+        if (!approveTx) {
+          setError("Failed to approve token");
+          return;
+        }
+        console.log("Token approved:", approveTx);
+
+        // 然后调用 fund_to_contract
+        console.log("Donating...");
+        const txHash = await fundToContract({ args: [amount] });
+        if (txHash) {
+          console.log("Transaction submitted:", txHash);
+          setSendValue("");
+        }
+      } catch (error) {
+        console.error("Error in transaction:", error);
+        setError(error instanceof Error ? error.message : "Transaction failed");
+      }
+    } catch (error) {
+      console.error("Error donating:", error);
+      if (error instanceof Error && error.message.includes("invalid number")) {
+        setError("Please enter a valid number");
+      } else {
+        setError(error instanceof Error ? error.message : "Failed to donate");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 处理取消
+  const handleCancel = () => {
+    setShowConfirmDialog(false);
+    setPendingAmount(null);
+    setIsLoading(false);
+  };
+
+  // 处理确认捐赠
+  const handleConfirmDonate = async () => {
+    try {
+      if (!pendingAmount) return;
+      
+      setShowConfirmDialog(false);
+      const amount = pendingAmount;
+      setPendingAmount(null);
+
+      // 先调用 approve
+      console.log("Approving token...");
+      try {
+        const approveTx = await approveToken({
+          args: [crowdfundingContract?.address, amount]
+        });
+        if (!approveTx) {
+          setError("Failed to approve token");
+          return;
+        }
+        console.log("Token approved:", approveTx);
+
+        // 然后调用 fund_to_contract
+        console.log("Donating...");
+        const txHash = await fundToContract({ args: [amount] });
+        if (txHash) {
+          console.log("Transaction submitted:", txHash);
+          setSendValue("");
+        }
+      } catch (error) {
+        console.error("Error in transaction:", error);
+        setError(error instanceof Error ? error.message : "Transaction failed");
+      }
+    } catch (error) {
+      console.error("Error in confirmation:", error);
+      setError(error instanceof Error ? error.message : "Confirmation failed");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="flex items-center flex-col flex-grow pt-10">
       <div className="px-5">
         <h1 className="text-center">
-          <span className="block text-2xl mb-2">Welcome to</span>
-          <span className="block text-4xl font-bold">Scaffold-Stark 2</span>
+          <span className="text-2xl mb-2">Welcome to </span>
+          <span className="text-4xl font-bold">
+            {description}
+          </span>
+          <span className="text-2xl mb-2"> Starknet CrowdFunding</span>
         </h1>
         <ConnectedAddress />
-        <p className="text-center text-lg">
-          Edit your smart contract{" "}
-          <code className="bg-underline italic text-base font-bold max-w-full break-words break-all inline-block">
-            YourContract.cairo
-          </code>{" "}
-          in{" "}
-          <code className="bg-underline italic text-base font-bold max-w-full break-words break-all inline-block">
-            packages/snfoundry/contracts/src
-          </code>
-        </p>
+        
+        {isPageLoading ? (
+          <div className="text-center mt-8">Loading campaign details...</div>
+        ) : (
+          <>
+            {/* 显示进度和目标 */}
+            <div className="mt-8 w-full max-w-lg mx-auto">
+              <div className="flex justify-between mb-2">
+                <span>Progress: {progress.toFixed(2)}%</span>
+                <span>Target: {formatSTRK(fundTarget?.toString())} {symbol}</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+                <div 
+                  className="bg-blue-600 h-2.5 rounded-full transition-all duration-500" 
+                  style={{ width: `${Math.min(progress, 100)}%` }}
+                ></div>
+              </div>
+            </div>
+
+            {/* 显示余额和截止时间 */}
+            <div className="mt-4 flex flex-col items-center gap-2">
+              <div className="font-bold mt-4">Funding Balance: {formatSTRK(fundBalance?.toString())} {symbol}</div>
+              <div className="text-sm">Deadline: {formatDeadline(deadline?.toString() || "")}</div>
+            </div>
+
+            {/* 捐赠输入和按钮 */}
+            <div className="mt-4 flex flex-col items-center gap-4">
+              <InputBase
+                value={sendValue}
+                onChange={setSendValue}
+                placeholder={`Amount to donate (${symbol})`}
+                disabled={isLoading || isWriteLoading || isApproving}
+                suffix={
+                  <button
+                    className="btn btn-primary h-[2.2rem] min-h-[2.2rem]"
+                    onClick={handleDonate}
+                    disabled={isLoading || isWriteLoading || isApproving || !sendValue}
+                  >
+                    {isLoading || isWriteLoading || isApproving ? "Processing..." : `Donate ${symbol}`}
+                  </button>
+                }
+              />
+              {error && <div className="text-red-500 text-sm">{error}</div>}
+            </div>
+          </>
+        )}
       </div>
 
-      <div className="bg-container flex-grow w-full mt-16 px-8 py-12">
-        <div className="flex justify-center items-center gap-12 flex-col sm:flex-row">
-          <div className="flex flex-col bg-base-100 relative text-[12px] px-10 py-10 text-center items-center max-w-xs rounded-3xl border border-gradient">
-            <div className="trapeze"></div>
-            <Image
-              src="/debug-icon.svg"
-              alt="icon"
-              width={26}
-              height={30}
-            ></Image>
-            <p>
-              Tinker with your smart contract using the{" "}
-              <Link href="/debug" passHref className="link">
-                Debug Contracts
-              </Link>{" "}
-              tab.
-            </p>
+      {/* 确认对话框 */}
+      <input 
+        type="checkbox" 
+        id="confirm-modal" 
+        className="modal-toggle" 
+        checked={showConfirmDialog} 
+        onChange={handleCancel}
+      />
+      {showConfirmDialog && pendingAmount && (
+        <GenericModal 
+          modalId="confirm-modal" 
+          className="modal-box bg-base-100 p-6 rounded-lg shadow-xl max-w-sm w-full"
+        >
+          <h3 className="text-lg font-bold mb-4">Confirm Donation</h3>
+          <p className="mb-4">
+            Are you sure you want to donate {formatSTRK(pendingAmount.toString())} {symbol}?
+          </p>
+          <div className="flex justify-end gap-4">
+            <button
+              className="btn btn-ghost"
+              onClick={handleCancel}
+            >
+              Cancel
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={handleConfirmDonate}
+              disabled={isLoading}
+            >
+              {isLoading ? "Processing..." : "Confirm"}
+            </button>
           </div>
-          <div className="flex flex-col bg-base-100 relative text-[12px] px-10 py-10 text-center items-center max-w-xs rounded-3xl border border-gradient">
-            <div className="trapeze"></div>
-            <Image
-              src="/explorer-icon.svg"
-              alt="icon"
-              width={20}
-              height={32}
-            ></Image>
-            <p>
-              Play around with Multiwrite transactions using
-              useScaffoldMultiWrite() hook
-            </p>
-          </div>
-        </div>
-      </div>
+        </GenericModal>
+      )}
     </div>
   );
 };

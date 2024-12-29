@@ -17,6 +17,12 @@ pub trait IFund<TContractState> {
     // Returns the campaign deadline timestamp
     fn get_deadline(self: @TContractState) -> felt252;
 
+    // Returns the token symbol
+    fn get_token_symbol(self: @TContractState) -> core::byte_array::ByteArray;
+
+    // Returns the token address
+    fn get_token_address(self: @TContractState) -> ContractAddress;
+
     // Allows users to fund the contract with STRK tokens
     fn fund_to_contract(ref self: TContractState, amount: u256);
 
@@ -41,6 +47,7 @@ pub mod crowdfunding {
     use starknet::get_caller_address;
     use openzeppelin_access::ownable::{OwnableComponent};
     use openzeppelin_token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
+    use openzeppelin_token::erc20::interface::{IERC20MetadataDispatcher, IERC20MetadataDispatcherTrait};
     use core::traits::TryInto;
 
     // Ownable component integration
@@ -265,6 +272,17 @@ pub mod crowdfunding {
         // Returns the campaign deadline timestamp
         fn get_deadline(self: @ContractState) -> felt252 {
             self.deadline.read()
+        }
+
+        // Returns the token symbol
+        fn get_token_symbol(self: @ContractState) -> core::byte_array::ByteArray {
+            let token_dispatcher = IERC20MetadataDispatcher { contract_address: self.token.read() };
+            token_dispatcher.symbol()
+        }
+
+        // Returns the token address
+        fn get_token_address(self: @ContractState) -> ContractAddress {
+            self.token.read()
         }
         
         //Reset the contract and start a new crowdfunding
