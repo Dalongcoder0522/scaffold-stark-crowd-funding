@@ -396,8 +396,8 @@ const Home = () => {
         <div className="flex-shrink-0 px-4 sm:px-6 lg:px-8 py-6">
           <div className="text-center">
             <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 dark:text-white">
-              <span className="block">{description}</span>
               <span className="block text-indigo-600 dark:text-indigo-400">Starknet CrowdFunding</span>
+              <span className="block">{description}</span>
             </h1>
             <div className="mt-2 text-base text-gray-500 dark:text-gray-400 sm:text-lg">
               Join us in making a difference. Support this project with {symbol}.
