@@ -1,7 +1,7 @@
 'use client';
 
 import { ConnectedAddress } from "~~/components/ConnectedAddress";
-import { Balance, EtherInput, InputBase } from "~~/components/scaffold-stark";
+import { InputBase } from "~~/components/scaffold-stark";
 import { useState, useMemo } from "react";
 import { useScaffoldReadContract, useScaffoldWriteContract, useDeployedContractInfo } from "~~/hooks/scaffold-stark";
 import { useAccount } from "~~/hooks/useAccount";
@@ -66,8 +66,15 @@ const Home = () => {
     functionName: "get_token_symbol",
   });
 
+  // 获取活动状态
+  const { data: isActive } = useScaffoldReadContract({
+    contractName: "crowdfunding",
+    functionName: "get_active",
+  });
+
   // 动态确定代币合约名称
   const tokenContractName = useMemo(() => {
+    debugger;
     if (!tokenSymbol) return "Strk"; // 默认使用 STRK
     const symbol = tokenSymbol.toString().toUpperCase();
     if (symbol === "ETH") return "Eth";
@@ -91,7 +98,7 @@ const Home = () => {
   const { sendAsync: approveToken, isPending: isApproving } = useScaffoldWriteContract({
     contractName: tokenContractName,
     functionName: "approve",
-    args: crowdfundingContract?.address ? [crowdfundingContract.address, 0n] as const : undefined
+    args:  [crowdfundingContract?.address, 0n] as const
   });
 
   // 捐赠功能
@@ -100,6 +107,45 @@ const Home = () => {
     functionName: "fund_to_contract",
     args: [0n] as const
   });
+
+  // 获取合约拥有者
+  const { data: initialOwner } = useScaffoldReadContract({
+    contractName: "crowdfunding",
+    functionName: "get_owner",
+  });
+
+  // 提现功能
+  const { sendAsync: withdrawFunds, isPending: isWithdrawing } = useScaffoldWriteContract({
+    contractName: "crowdfunding",
+    functionName: "withdraw_funds",
+  });
+
+  // 激活/停用功能
+  const { sendAsync: setActive, isPending: isSettingActive } = useScaffoldWriteContract({
+    contractName: "crowdfunding",
+    functionName: "set_active",
+    args: [true] as const
+  });
+
+  // 处理激活状态切换
+  const handleToggleActive = async () => {
+    try {
+      setError(null);
+      setIsLoading(true);
+
+      console.log("Toggling active status...");
+      const newStatus = !isActive;
+      const txHash = await setActive({ args: [newStatus] });
+      if (txHash) {
+        console.log(`Status change transaction submitted: ${newStatus ? "activated" : "deactivated"}`);
+      }
+    } catch (error) {
+      console.error("Error changing status:", error);
+      setError(error instanceof Error ? error.message : "Failed to change status");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // 转换描述为可读字符串
   const description = fundDescription ? feltToString(fundDescription.toString()) : "Loading...";
@@ -147,6 +193,16 @@ const Home = () => {
     isLoadingTarget,
     isLoadingSymbol
   ]);
+
+  // 检查是否是合约拥有者
+  const isOwner = useMemo(() => {
+    if (!initialOwner || !address) return false;
+    // 将 initialOwner（十进制）转换为 16 进制
+    const ownerHex = "0x" + BigInt(initialOwner.toString()).toString(16).padStart(64, '0');
+    // address 已经是 16 进制，但确保格式统一
+    const addressHex = address.toLowerCase();
+    return ownerHex.toLowerCase() === addressHex;
+  }, [initialOwner, address]);
 
   // 处理捐赠
   const handleDonate = async () => {
@@ -275,6 +331,25 @@ const Home = () => {
     }
   };
 
+  // 处理提现
+  const handleWithdraw = async () => {
+    try {
+      setError(null);
+      setIsLoading(true);
+
+      console.log("Withdrawing funds...");
+      const txHash = await withdrawFunds();
+      if (txHash) {
+        console.log("Withdrawal transaction submitted:", txHash);
+      }
+    } catch (error) {
+      console.error("Error withdrawing:", error);
+      setError(error instanceof Error ? error.message : "Failed to withdraw");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="flex items-center flex-col flex-grow pt-10">
       <div className="px-5">
@@ -287,50 +362,84 @@ const Home = () => {
         </h1>
         <ConnectedAddress />
         
-        {isPageLoading ? (
-          <div className="text-center mt-8">Loading campaign details...</div>
-        ) : (
+        {/* Toggle Active Button - 只对合约拥有者显示 */}
+        {isOwner && (
+          <div className="mt-4">
+            <button
+              className={`btn ${isActive ? 'btn-warning' : 'btn-success'} mt-4`}
+              onClick={handleToggleActive}
+              disabled={isLoading || isSettingActive}
+            >
+              {isLoading || isSettingActive ? "Processing..." : (isActive ? "Deactivate Funding" : "Activate Funding")}
+            </button>
+          </div>
+        )}
+        
+        {isActive ? (
+          // 当 active 为 true 时显示原有内容
           <>
-            {/* 显示进度和目标 */}
-            <div className="mt-8 w-full max-w-lg mx-auto">
-              <div className="flex justify-between mb-2">
-                <span>Progress: {progress.toFixed(2)}%</span>
-                <span>Target: {formatSTRK(fundTarget?.toString())} {symbol}</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
-                <div 
-                  className="bg-blue-600 h-2.5 rounded-full transition-all duration-500" 
-                  style={{ width: `${Math.min(progress, 100)}%` }}
-                ></div>
-              </div>
-            </div>
+            {isPageLoading ? (
+              <div className="text-center mt-8">Loading campaign details...</div>
+            ) : (
+              <>
+                {/* 显示进度和目标 */}
+                <div className="mt-8 w-full max-w-lg mx-auto">
+                  <div className="flex justify-between mb-2">
+                    <span>Progress: {progress.toFixed(2)}%</span>
+                    <span>Target: {formatSTRK(fundTarget?.toString())} {symbol}</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+                    <div 
+                      className="bg-blue-600 h-2.5 rounded-full transition-all duration-500" 
+                      style={{ width: `${Math.min(progress, 100)}%` }}
+                    ></div>
+                  </div>
+                </div>
 
-            {/* 显示余额和截止时间 */}
-            <div className="mt-4 flex flex-col items-center gap-2">
-              <div className="font-bold mt-4">Funding Balance: {formatSTRK(fundBalance?.toString())} {symbol}</div>
-              <div className="text-sm">Deadline: {formatDeadline(deadline?.toString() || "")}</div>
-            </div>
+                {/* 显示余额和截止时间 */}
+                <div className="mt-4 flex flex-col items-center gap-2">
+                  <div className="font-bold mt-4">Funding Balance: {formatSTRK(fundBalance?.toString())} {symbol}</div>
+                  <div className="text-sm">Deadline: {formatDeadline(deadline?.toString() || "")}</div>
+                  
+                  {/* 提现按钮 - 只对合约拥有者显示 */}
+                  {isOwner && (
+                    <button
+                      className="btn btn-secondary mt-4"
+                      onClick={handleWithdraw}
+                      disabled={isLoading || isWithdrawing || !fundBalance || BigInt(fundBalance.toString()) <= 0n}
+                    >
+                      {isLoading || isWithdrawing ? "Processing..." : "Withdraw Funds"}
+                    </button>
+                  )}
+                </div>
 
-            {/* 捐赠输入和按钮 */}
-            <div className="mt-4 flex flex-col items-center gap-4">
-              <InputBase
-                value={sendValue}
-                onChange={setSendValue}
-                placeholder={`Amount to donate (${symbol})`}
-                disabled={isLoading || isWriteLoading || isApproving}
-                suffix={
-                  <button
-                    className="btn btn-primary h-[2.2rem] min-h-[2.2rem]"
-                    onClick={handleDonate}
-                    disabled={isLoading || isWriteLoading || isApproving || !sendValue}
-                  >
-                    {isLoading || isWriteLoading || isApproving ? "Processing..." : `Donate ${symbol}`}
-                  </button>
-                }
-              />
-              {error && <div className="text-red-500 text-sm">{error}</div>}
-            </div>
+                {/* 捐赠输入和按钮 */}
+                <div className="mt-4 flex flex-col items-center gap-4">
+                  <InputBase
+                    value={sendValue}
+                    onChange={setSendValue}
+                    placeholder={`Amount to donate (${symbol})`}
+                    disabled={isLoading || isWriteLoading || isApproving}
+                    suffix={
+                      <button
+                        className="btn btn-primary h-[2.2rem] min-h-[2.2rem]"
+                        onClick={handleDonate}
+                        disabled={isLoading || isWriteLoading || isApproving || !sendValue}
+                      >
+                        {isLoading || isWriteLoading || isApproving ? "Processing..." : `Donate ${symbol}`}
+                      </button>
+                    }
+                  />
+                  {error && <div className="text-red-500 text-sm">{error}</div>}
+                </div>
+              </>
+            )}
           </>
+        ) : (
+          // 当 active 为 false 时只显示关闭信息
+          <div className="text-center text-red-500 font-bold mt-8">
+            Current funding is closed
+          </div>
         )}
       </div>
 

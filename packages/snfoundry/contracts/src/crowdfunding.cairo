@@ -37,6 +37,15 @@ pub trait IFund<TContractState> {
         fund_description: felt252,
         deadline: felt252,
         initial_owner: ContractAddress);
+
+    // Returns the contract owner
+    fn get_owner(self: @TContractState) -> ContractAddress;
+
+    // 获取活动状态
+    fn get_active(self: @TContractState) -> bool;
+
+    // 设置活动状态（只有所有者可以调用）
+    fn set_active(ref self: TContractState, new_active: bool);
 }
 
 
@@ -45,9 +54,9 @@ pub mod crowdfunding {
     use starknet::ContractAddress;
     use starknet::event::EventEmitter;
     use starknet::get_caller_address;
-    use openzeppelin_access::ownable::{OwnableComponent};
-    use openzeppelin_token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
-    use openzeppelin_token::erc20::interface::{IERC20MetadataDispatcher, IERC20MetadataDispatcherTrait};
+    use openzeppelin::access::ownable::{OwnableComponent};
+    use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
+    use openzeppelin::token::erc20::interface::{IERC20MetadataDispatcher, IERC20MetadataDispatcherTrait};
     use core::traits::TryInto;
 
     // Ownable component integration
@@ -67,6 +76,7 @@ pub mod crowdfunding {
         deadline: felt252,              // Campaign end timestamp Unix timestamp 1740805200(2025年3月1日00:00:00) https://tool.chinaz.com/tools/unixtime.aspx
         #[substorage(v0)]
         ownable: OwnableComponent::Storage,
+        active: bool,               // Campaign active status
     }
 
     // Event definitions
@@ -79,6 +89,7 @@ pub mod crowdfunding {
         Transfer: Transfer,
         TransferFailed: TransferFailed,
         ResetFund: ResetFund,
+        ActiveChanged: ActiveChanged,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -112,6 +123,11 @@ pub mod crowdfunding {
         initial_owner: ContractAddress
     }
 
+    #[derive(Drop, starknet::Event)]
+    struct ActiveChanged {
+        active: bool,
+    }
+
     // Contract constructor
     #[constructor]
     fn constructor(
@@ -130,6 +146,7 @@ pub mod crowdfunding {
         self.grantee_address.write(grantee_address);
         self.deadline.write(deadline);
         self.ownable.initializer(initial_owner);
+        self.active.write(true);  // 初始化为激活状态
         self.emit(ResetFund{token,grantee_address,fund_target,fund_description,deadline,initial_owner});
     }
 
@@ -203,6 +220,7 @@ pub mod crowdfunding {
         // Can only be called by contract owner when deadline is reached or target is met
         fn withdraw_funds(ref self: ContractState) {
             self.ownable.assert_only_owner();
+            assert(self.active.read(), 'Not active status');
             println!("in:in" );
             // Check if deadline has passed or target is met
             let token_dispatcher = IERC20Dispatcher { contract_address: self.token.read() };
@@ -237,7 +255,9 @@ pub mod crowdfunding {
             match token_dispatcher.transfer(grantee_address, balance) {
                 true => {
                     println!("Transfer successful!");
+                    self.active.write(false);  // 提现后设置为非激活状态
                     self.emit(Transfer { from: current_contract_address, to: grantee_address, amount: balance });
+                    self.emit(ActiveChanged { active: false });
                 },
                 false => {
                     println!("Transfer failed!");
@@ -274,10 +294,23 @@ pub mod crowdfunding {
             self.deadline.read()
         }
 
-        // Returns the token symbol
         fn get_token_symbol(self: @ContractState) -> core::byte_array::ByteArray {
-            let token_dispatcher = IERC20MetadataDispatcher { contract_address: self.token.read() };
-            token_dispatcher.symbol()
+            let token_address = self.token.read();
+            let contract_felt: felt252 = token_address.try_into().unwrap();
+            println!("Token address: (hex): 0x{:x}", contract_felt);
+
+            // 根据合约地址返回对应的符号
+            if contract_felt == 0x04718f5a0Fc34cC1AF16A1cdee98fFB20C31f5cD61D6Ab07201858f4287c938D {
+                println!("Token identified as STRK");
+                let strk: core::byte_array::ByteArray = "STRK";
+                strk
+            } else if contract_felt == 0x049D36570D4e46f48e99674bd3fcc84644DdD6b96F7C741B1562B82f9e004dC7 {
+                println!("Token identified as ETH");
+                let eth: core::byte_array::ByteArray = "ETH";
+                eth
+            } else {
+                IERC20MetadataDispatcher { contract_address: self.token.read() }.symbol()
+            }
         }
 
         // Returns the token address
@@ -285,6 +318,23 @@ pub mod crowdfunding {
             self.token.read()
         }
         
+        // Returns the contract owner
+        fn get_owner(self: @ContractState) -> ContractAddress {
+            self.ownable.owner()
+        }
+
+        // 获取活动状态
+        fn get_active(self: @ContractState) -> bool {
+            self.active.read()
+        }
+
+        // 设置活动状态（只有所有者可以调用）
+        fn set_active(ref self: ContractState, new_active: bool) {
+            self.ownable.assert_only_owner();
+            self.active.write(new_active);
+            self.emit(ActiveChanged { active: new_active });
+        }
+
         //Reset the contract and start a new crowdfunding
         fn reset_fund(ref self: ContractState,
             token: ContractAddress,
@@ -309,7 +359,9 @@ pub mod crowdfunding {
             self.grantee_address.write(grantee_address);
             self.deadline.write(deadline);
             self.ownable.initializer(initial_owner);
+            self.active.write(true);  // 重置后设置为激活状态
             self.emit(ResetFund{token:self.token.read(),grantee_address,fund_target,fund_description,deadline,initial_owner});
+            self.emit(ActiveChanged { active: true });
         }
     }
 }

@@ -7,7 +7,7 @@ const deployedContracts = {
   devnet: {
     crowdfunding: {
       address:
-        "0x2927e6052fca01e7a669c43e38cabadb696e916d3f1298986f46bc53f0a65",
+        "0xdce23d8aeae4cab154c1e465f11ac2ad38af49140f899995eaaa75eecd44ab",
       abi: [
         {
           type: "impl",
@@ -43,6 +43,20 @@ const deployedContracts = {
             {
               name: "pending_word_len",
               type: "core::integer::u32",
+            },
+          ],
+        },
+        {
+          type: "enum",
+          name: "core::bool",
+          variants: [
+            {
+              name: "False",
+              type: "()",
+            },
+            {
+              name: "True",
+              type: "()",
             },
           ],
         },
@@ -162,6 +176,40 @@ const deployedContracts = {
                 {
                   name: "initial_owner",
                   type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              outputs: [],
+              state_mutability: "external",
+            },
+            {
+              type: "function",
+              name: "get_owner",
+              inputs: [],
+              outputs: [
+                {
+                  type: "core::starknet::contract_address::ContractAddress",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
+              name: "get_active",
+              inputs: [],
+              outputs: [
+                {
+                  type: "core::bool",
+                },
+              ],
+              state_mutability: "view",
+            },
+            {
+              type: "function",
+              name: "set_active",
+              inputs: [
+                {
+                  name: "new_active",
+                  type: "core::bool",
                 },
               ],
               outputs: [],
@@ -415,6 +463,18 @@ const deployedContracts = {
         },
         {
           type: "event",
+          name: "crowdfunding::crowdfunding::crowdfunding::ActiveChanged",
+          kind: "struct",
+          members: [
+            {
+              name: "active",
+              type: "core::bool",
+              kind: "data",
+            },
+          ],
+        },
+        {
+          type: "event",
           name: "crowdfunding::crowdfunding::crowdfunding::Event",
           kind: "enum",
           variants: [
@@ -443,11 +503,16 @@ const deployedContracts = {
               type: "crowdfunding::crowdfunding::crowdfunding::ResetFund",
               kind: "nested",
             },
+            {
+              name: "ActiveChanged",
+              type: "crowdfunding::crowdfunding::crowdfunding::ActiveChanged",
+              kind: "nested",
+            },
           ],
         },
       ],
       classHash:
-        "0x4e444fa1ce16ede9304869e53f00a9245703e813a7afa555a32566f6c793ace",
+        "0x7ef9da282b80201adeb247d70afa2b5904553321ec28af776261f36306c42f7",
     },
   },
 } as const;
