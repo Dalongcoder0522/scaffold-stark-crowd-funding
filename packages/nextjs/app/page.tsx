@@ -2,10 +2,9 @@
 
 import { ConnectedAddress } from "~~/components/ConnectedAddress";
 import { InputBase } from "~~/components/scaffold-stark";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useScaffoldReadContract, useScaffoldWriteContract, useDeployedContractInfo } from "~~/hooks/scaffold-stark";
 import { useAccount } from "~~/hooks/useAccount";
-import GenericModal from "~~/components/scaffold-stark/CustomConnectButton/GenericModal";
 
 // 将 felt252 转换为字符串
 const feltToString = (felt: string) => {
@@ -37,12 +36,33 @@ const formatSTRK = (amount: string | undefined, decimals: number = 18): string =
     : integerPart.toString();
 };
 
+// 格式化倒计时
+const formatCountdown = (remainingTime: number): string => {
+  if (remainingTime <= 0) return "Ended";
+  
+  const days = Math.floor(remainingTime / (24 * 60 * 60));
+  const hours = Math.floor((remainingTime % (24 * 60 * 60)) / (60 * 60));
+  const minutes = Math.floor((remainingTime % (60 * 60)) / 60);
+  const seconds = Math.floor(remainingTime % 60);
+
+  if (days > 0) {
+    return `${days}d ${hours}h ${minutes}m ${seconds}s`;
+  } else if (hours > 0) {
+    return `${hours}h ${minutes}m ${seconds}s`;
+  } else if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  } else {
+    return `${seconds}s`;
+  }
+};
+
 const Home = () => {
   const [sendValue, setSendValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingAmount, setPendingAmount] = useState<bigint | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [remainingTime, setRemainingTime] = useState<number>(0);
   const { address } = useAccount();
   
   // 获取 crowdfunding 合约地址
@@ -74,7 +94,6 @@ const Home = () => {
 
   // 动态确定代币合约名称
   const tokenContractName = useMemo(() => {
-    debugger;
     if (!tokenSymbol) return "Strk"; // 默认使用 STRK
     const symbol = tokenSymbol.toString().toUpperCase();
     if (symbol === "ETH") return "Eth";
@@ -350,132 +369,307 @@ const Home = () => {
     }
   };
 
+  // 更新倒计时
+  useEffect(() => {
+    if (!deadline) return;
+
+    const updateCountdown = () => {
+      const now = Math.floor(Date.now() / 1000);
+      const endTime = Number(deadline.toString());
+      const timeLeft = endTime - now;
+      setRemainingTime(Math.max(0, timeLeft));
+    };
+
+    // 初始更新
+    updateCountdown();
+
+    // 每秒更新一次
+    const timer = setInterval(updateCountdown, 1000);
+
+    return () => clearInterval(timer);
+  }, [deadline]);
+
   return (
-    <div className="flex items-center flex-col flex-grow pt-10">
-      <div className="px-5">
-        <h1 className="text-center">
-          <span className="text-2xl mb-2">Welcome to </span>
-          <span className="text-4xl font-bold">
-            {description}
-          </span>
-          <span className="text-2xl mb-2"> Starknet CrowdFunding</span>
-        </h1>
-        <ConnectedAddress />
-        
-        {/* Toggle Active Button - 只对合约拥有者显示 */}
-        {isOwner && (
-          <div className="mt-4">
-            <button
-              className={`btn ${isActive ? 'btn-warning' : 'btn-success'} mt-4`}
-              onClick={handleToggleActive}
-              disabled={isLoading || isSettingActive}
-            >
-              {isLoading || isSettingActive ? "Processing..." : (isActive ? "Deactivate Funding" : "Activate Funding")}
-            </button>
+    <div className="bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+      <div className="flex flex-col">
+        {/* Hero Section - Top */}
+        <div className="flex-shrink-0 px-4 sm:px-6 lg:px-8 py-6">
+          <div className="text-center">
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 dark:text-white">
+              <span className="block">{description}</span>
+              <span className="block text-indigo-600 dark:text-indigo-400">Starknet CrowdFunding</span>
+            </h1>
+            <div className="mt-2 text-base text-gray-500 dark:text-gray-400 sm:text-lg">
+              Join us in making a difference. Support this project with {symbol}.
+            </div>
           </div>
-        )}
-        
-        {isActive ? (
-          // 当 active 为 true 时显示原有内容
-          <>
-            {isPageLoading ? (
-              <div className="text-center mt-8">Loading campaign details...</div>
-            ) : (
-              <>
-                {/* 显示进度和目标 */}
-                <div className="mt-8 w-full max-w-lg mx-auto">
-                  <div className="flex justify-between mb-2">
-                    <span>Progress: {progress.toFixed(2)}%</span>
-                    <span>Target: {formatSTRK(fundTarget?.toString())} {symbol}</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
-                    <div 
-                      className="bg-blue-600 h-2.5 rounded-full transition-all duration-500" 
-                      style={{ width: `${Math.min(progress, 100)}%` }}
-                    ></div>
+
+          {/* Wallet Connection */}
+          <div className="mt-4 flex justify-center">
+            <ConnectedAddress />
+          </div>
+
+          {isOwner && (
+            <div className="mt-2 text-center">
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                You are the contract owner
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Main Content */}
+        <div className="px-4 sm:px-6 lg:px-8 pb-6">
+          {isActive ? (
+            <div className="max-w-4xl mx-auto">
+              {isPageLoading ? (
+                <div className="flex justify-center items-center">
+                  <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-indigo-500"></div>
+                </div>
+              ) : (
+                <div className="bg-white dark:bg-gray-800 shadow overflow-hidden rounded-lg">
+                  {/* Progress Card */}
+                  <div className="p-4">
+                    <div className="space-y-4">
+                      {/* Progress Bar */}
+                      <div>
+                        <div className="flex justify-between mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                          <span>Progress: {progress.toFixed(2)}%</span>
+                          <span>Target: {formatSTRK(fundTarget?.toString())} {symbol}</span>
+                        </div>
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                          <div 
+                            className="bg-indigo-600 dark:bg-indigo-500 h-3 rounded-full transition-all duration-500 ease-in-out"
+                            style={{ width: `${Math.min(progress, 100)}%` }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      {/* Stats Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                          <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Current Balance</div>
+                          <div className="mt-1 flex items-baseline">
+                            <span className="text-2xl font-semibold text-gray-900 dark:text-white">
+                              {formatSTRK(fundBalance?.toString())}
+                            </span>
+                            <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">{symbol}</span>
+                          </div>
+                        </div>
+                        <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                          <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Time Remaining</div>
+                          <div className="mt-1">
+                            <div className="text-2xl font-bold tracking-tight">
+                              <span className={`inline-flex items-center ${
+                                remainingTime > 24 * 60 * 60 
+                                  ? 'text-green-600 dark:text-green-400'
+                                  : remainingTime > 0
+                                    ? 'text-yellow-600 dark:text-yellow-400'
+                                    : 'text-red-600 dark:text-red-400'
+                              }`}>
+                                {remainingTime > 0 ? '⏱ ' : '🔚 '}
+                                {formatCountdown(remainingTime)}
+                              </span>
+                            </div>
+                            <div className="mt-1">
+                              <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-blue-50/50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-200 border border-blue-100 dark:border-blue-800/30">
+                                Deadline: {formatDeadline(deadline?.toString() || "")}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Donation Form */}
+                      <div className="mt-auto">
+                        <div className="flex flex-col space-y-4">
+                          <InputBase
+                            value={sendValue}
+                            onChange={setSendValue}
+                            placeholder={`Amount to donate (${symbol})`}
+                            disabled={isLoading || isWriteLoading || isApproving}
+                          />
+                          <button
+                            className={`w-full px-4 py-3 rounded-md text-white font-medium ${
+                              isLoading || isWriteLoading || isApproving || !sendValue
+                                ? 'bg-gray-400 cursor-not-allowed'
+                                : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
+                            } transition-all duration-200`}
+                            onClick={handleDonate}
+                            disabled={isLoading || isWriteLoading || isApproving || !sendValue}
+                          >
+                            {isLoading || isWriteLoading || isApproving ? (
+                              <span className="flex items-center justify-center">
+                                <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Processing...
+                              </span>
+                            ) : (
+                              `Donate ${symbol}`
+                            )}
+                          </button>
+                          {error && (
+                            <div className="text-red-500 text-sm bg-red-50 dark:bg-red-900/20 p-2 rounded-md">
+                              {error}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Admin Controls */}
+                        {isOwner && (
+                          <div className="mt-4 flex justify-end gap-4">
+                            <button
+                              className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm ${
+                                isActive 
+                                  ? 'text-white bg-red-600 hover:bg-red-700 focus:ring-red-500'
+                                  : 'text-white bg-green-600 hover:bg-green-700 focus:ring-green-500'
+                              } focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all duration-200`}
+                              onClick={handleToggleActive}
+                              disabled={isLoading || isSettingActive}
+                            >
+                              {isLoading || isSettingActive ? (
+                                <span className="flex items-center">
+                                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                  Processing...
+                                </span>
+                              ) : (
+                                isActive ? "Deactivate Funding" : "Activate Funding"
+                              )}
+                            </button>
+                            <button
+                              className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm ${
+                                isLoading || isWithdrawing || !fundBalance || 
+                                BigInt(fundBalance.toString()) <= 0n ||
+                                (fundTarget && deadline && BigInt(fundBalance.toString()) < BigInt(fundTarget.toString()) && 
+                                 Date.now() / 1000 <= BigInt(deadline.toString()))
+                                  ? 'bg-gray-400 cursor-not-allowed'
+                                  : 'text-white bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 focus:outline-none focus:ring-2 focus:ring-offset-2'
+                              } transition-all duration-200`}
+                              onClick={handleWithdraw}
+                              disabled={isLoading || isWithdrawing || !fundBalance || 
+                                      BigInt(fundBalance.toString()) <= 0n ||
+                                      (fundTarget && deadline && BigInt(fundBalance.toString()) < BigInt(fundTarget.toString()) && 
+                                       Date.now() / 1000 <= BigInt(deadline.toString()))}
+                            >
+                              {isLoading || isWithdrawing ? (
+                                <span className="flex items-center">
+                                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                  Processing...
+                                </span>
+                              ) : (
+                                "Withdraw Funds"
+                              )}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
-
-                {/* 显示余额和截止时间 */}
-                <div className="mt-4 flex flex-col items-center gap-2">
-                  <div className="font-bold mt-4">Funding Balance: {formatSTRK(fundBalance?.toString())} {symbol}</div>
-                  <div className="text-sm">Deadline: {formatDeadline(deadline?.toString() || "")}</div>
-                  
-                  {/* 提现按钮 - 只对合约拥有者显示 */}
-                  {isOwner && (
-                    <button
-                      className="btn btn-secondary mt-4"
-                      onClick={handleWithdraw}
-                      disabled={isLoading || isWithdrawing || !fundBalance || BigInt(fundBalance.toString()) <= 0n}
-                    >
-                      {isLoading || isWithdrawing ? "Processing..." : "Withdraw Funds"}
-                    </button>
-                  )}
+              )}
+            </div>
+          ) : (
+            <div className="h-full max-w-4xl mx-auto flex items-center justify-center">
+              <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-400 p-4 rounded-md">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
+                      Funding Closed
+                    </h3>
+                    <div className="mt-2 text-sm text-red-700 dark:text-red-300">
+                      This crowdfunding campaign is currently not active. Please check back later.
+                    </div>
+                  </div>
                 </div>
-
-                {/* 捐赠输入和按钮 */}
-                <div className="mt-4 flex flex-col items-center gap-4">
-                  <InputBase
-                    value={sendValue}
-                    onChange={setSendValue}
-                    placeholder={`Amount to donate (${symbol})`}
-                    disabled={isLoading || isWriteLoading || isApproving}
-                    suffix={
+                {/* Admin Controls */}
+                {isOwner && (
+                    <div className="mt-4 flex justify-end gap-4">
                       <button
-                        className="btn btn-primary h-[2.2rem] min-h-[2.2rem]"
-                        onClick={handleDonate}
-                        disabled={isLoading || isWriteLoading || isApproving || !sendValue}
+                          className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm ${
+                              isActive
+                                  ? 'text-white bg-red-600 hover:bg-red-700 focus:ring-red-500'
+                                  : 'text-white bg-green-600 hover:bg-green-700 focus:ring-green-500'
+                          } focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all duration-200`}
+                          onClick={handleToggleActive}
+                          disabled={isLoading || isSettingActive}
                       >
-                        {isLoading || isWriteLoading || isApproving ? "Processing..." : `Donate ${symbol}`}
+                        {isLoading || isSettingActive ? (
+                            <span className="flex items-center">
+                                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                  Processing...
+                                </span>
+                        ) : (
+                            isActive ? "Deactivate Funding" : "Activate Funding"
+                        )}
                       </button>
-                    }
-                  />
-                  {error && <div className="text-red-500 text-sm">{error}</div>}
-                </div>
-              </>
-            )}
-          </>
-        ) : (
-          // 当 active 为 false 时只显示关闭信息
-          <div className="text-center text-red-500 font-bold mt-8">
-            Current funding is closed
-          </div>
-        )}
+                    </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* 确认对话框 */}
-      <input 
-        type="checkbox" 
-        id="confirm-modal" 
-        className="modal-toggle" 
-        checked={showConfirmDialog} 
-        onChange={handleCancel}
-      />
+      {/* Confirmation Modal */}
       {showConfirmDialog && pendingAmount && (
-        <GenericModal 
-          modalId="confirm-modal" 
-          className="modal-box bg-base-100 p-6 rounded-lg shadow-xl max-w-sm w-full"
-        >
-          <h3 className="text-lg font-bold mb-4">Confirm Donation</h3>
-          <p className="mb-4">
-            Are you sure you want to donate {formatSTRK(pendingAmount.toString())} {symbol}?
-          </p>
-          <div className="flex justify-end gap-4">
-            <button
-              className="btn btn-ghost"
-              onClick={handleCancel}
-            >
-              Cancel
-            </button>
-            <button
-              className="btn btn-primary"
-              onClick={handleConfirmDonate}
-              disabled={isLoading}
-            >
-              {isLoading ? "Processing..." : "Confirm"}
-            </button>
+        <div className="fixed inset-0 overflow-y-auto z-50">
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+            <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
+              <div>
+                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-indigo-100 dark:bg-indigo-900">
+                  <svg className="h-6 w-6 text-indigo-600 dark:text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="mt-3 text-center sm:mt-5">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
+                    Confirm Donation
+                  </h3>
+                  <div className="mt-2">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Are you sure you want to donate {formatSTRK(pendingAmount.toString())} {symbol}?
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
+                <button
+                  type="button"
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:col-start-2 sm:text-sm"
+                  onClick={handleConfirmDonate}
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Processing..." : "Confirm"}
+                </button>
+                <button
+                  type="button"
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:col-start-1 sm:text-sm"
+                  onClick={handleCancel}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
           </div>
-        </GenericModal>
+        </div>
       )}
     </div>
   );
