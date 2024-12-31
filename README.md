@@ -1,65 +1,160 @@
-# Crowdfunding Contract (StarkNet)
+# Starknet Crowdfunding Platform
 
-This StarkNet contract implements a crowdfunding mechanism where users can contribute to a campaign with any ERC20 tokens(contract addresss is needed to pass to the contract). Funds are withdrawn to a designated grantee address once the target amount is reached or the campaign deadline is passed.
+A decentralized crowdfunding platform built on StarkNet, enabling users to create and participate in fundraising campaigns using ERC20 tokens. The platform consists of a Cairo smart contract for on-chain logic and a Next.js frontend for user interaction.
 
 ## Features
 
-*   Users can donate ERC20 tokens to the contract.
-*   Contract owner can withdraw funds to the grantee address.
-*   Contract owner can reset the contract for a new campaign (after target is met or deadline passes and all funds are withdrawn).
-*   Supports any ERC20 token on starknet(default STRK)
+### Smart Contract
+* Support for any ERC20 token on StarkNet (currently UI supports STRK and ETH)
+* Secure fund management with ownership controls
+* Deadline-based campaign management
+* Flexible campaign reset functionality
+* Transparent fund tracking and withdrawal system
 
-## Usage
+### Frontend Interface
+* Modern, responsive UI built with Next.js and Tailwind CSS
+* Real-time campaign progress tracking
+* Interactive donation interface
+* Countdown timer for campaign deadline
+* Dark/Light mode support
+* Owner-specific controls for campaign management
 
-1.  Deploy the contract with the desired campaign details:
-    *   `token` (optional, defaults to STRK token address): Contract address of the ERC20 token used for funding.
-    *   `grantee_address`: Address of the beneficiary who will receive the raised funds.
-    *   `fund_target`: Target amount to raise in the crowdfunding campaign.
-    *   `fund_description`: Description of the campaign (English only).
-    *   `deadline`: Unix timestamp representing the campaign end date.
-    *   `initial_owner`: Address of the initial contract owner.
+## Project Structure
 
-2.  Users can call the `fund_to_contract` function to donate STRK tokens to the contract.
+```
+scaffold-stark-crowd-funding/
+├── packages/
+│   ├── nextjs/              # Frontend application
+│   │   ├── app/            # Next.js pages and components
+│   │   ├── components/     # Reusable UI components
+│   │   └── hooks/         # Custom React hooks
+│   └── snfoundry/          # Smart contract
+│       └── contracts/     # Cairo contract files
+```
 
-3.  The contract owner can call the `withdraw_funds` function to withdraw all collected funds to the grantee address when the target is met or the deadline is reached.
+## Prerequisites
 
-4.  After a successful campaign or withdrawal, the contract owner can call the `reset_fund` function to set up a new campaign with different details. This requires the previous campaign to be completed (target met or deadline passed) and all funds withdrawn.
+* Node.js (v16 or higher)
+* Yarn package manager
+* Scarb (for Cairo contract development)
+* StarkNet wallet (e.g., ArgentX, Braavos)
 
-## Interface
+## Getting Started
 
-The contract implements the `IFund` interface which defines the following functions:
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/scaffold-stark-crowd-funding.git
+   cd scaffold-stark-crowd-funding
+   ```
 
-*   `get_fund_balance`: Returns the current balance of the contract in STRK tokens.
-*   `get_fund_target`: Returns the target funding amount for the campaign.
-*   `get_fund_description`: Returns the description of the crowdfunding campaign.
-*   `get_deadline`: Returns the Unix timestamp for the campaign deadline.
-*   `fund_to_contract`: Allows users to donate STRK tokens to the contract.
-*   `withdraw_funds`: Allows the contract owner to withdraw all collected funds to the grantee address.
-*   `reset_fund`: Allows the contract owner to reset the contract for a new campaign.
+2. Install dependencies:
+   ```bash
+   yarn install
+   ```
+
+3. Compile the smart contract:
+   ```bash
+   cd packages/snfoundry/contracts
+   scarb build
+   ```
+
+4. Run contract tests:
+   ```bash
+   scarb test
+   ```
+
+5. Deploy the contract:
+   ```bash
+   yarn deploy --network {NETWORK_NAME} # "sepolia" or "mainnet", defaults to "devnet"
+   ```
+
+6. Start the frontend development server:
+   ```bash
+   cd packages/nextjs
+   yarn dev
+   ```
+
+## Smart Contract Interface
+
+The contract implements the `IFund` interface with the following functions:
+
+### Read Functions
+* `get_fund_balance`: Get current campaign balance
+* `get_fund_target`: Get campaign funding target
+* `get_fund_description`: Get campaign description
+* `get_deadline`: Get campaign end timestamp
+* `get_token_symbol`: Get fundraising token symbol
+* `get_token_address`: Get fundraising token contract address
+* `get_owner`: Get contract owner address
+* `get_active`: Get campaign active status
+
+### Write Functions
+* `fund_to_contract`: Contribute tokens to the campaign
+* `withdraw_funds`: Withdraw funds to grantee (owner only)
+* `reset_fund`: Reset campaign with new parameters (owner only)
+* `set_active`: Toggle campaign active status (owner only)
+
+## Frontend Features
+
+### Campaign Information
+* Real-time display of:
+  - Campaign description
+  - Current balance
+  - Funding target
+  - Progress percentage
+  - Remaining time
+  - Token symbol
+
+### User Interface
+* Wallet connection integration
+* Donation input with token selection
+* Progress bar visualization
+* Countdown timer
+* Responsive design for all devices
+* Dark/Light theme support
+
+### Owner Controls
+* Campaign activation/deactivation
+* Fund withdrawal management
+* Campaign reset functionality
 
 ## Events
 
-The contract emits several events:
+The contract emits the following events:
 
-*   `OwnableEvent`: Events related to contract ownership management (inherited from OwnableComponent).
-*   `SelfDestructed`: Emitted when the contract is self-destructed, indicating the recipient address and remaining funds.
-*   `Transfer`: Emitted when a successful token transfer occurs (e.g., user donation).
-*   `TransferFailed`: Emitted when a token transfer fails.
-*   `ResetFund`: Emitted when the contract is reset for a new campaign, including details of the new campaign.
+* `OwnableEvent`: Ownership management events
+* `SelfDestructed`: Contract self-destruction event
+* `Transfer`: Successful token transfer event
+* `TransferFailed`: Failed transfer event
+* `ResetFund`: Campaign reset event
+* `ActiveChanged`: Campaign status change event
+
+## Security Considerations
+
+* Owner-only access control for sensitive functions
+* Deadline enforcement for campaign lifecycle
+* Safe token transfer handling
+* Input validation for all user interactions
+* Proper error handling and event emission
 
 ## Dependencies
 
-*   OpenZeppelin Ownable: Provides ownership management functionality.
-*   OpenZeppelin ERC20: Provides interaction with ERC20 tokens.
+### Smart Contract
+* OpenZeppelin Contracts (Cairo)
+  - Ownable component
+  - ERC20 interface
 
-## Deployment and Interaction (Example using starkli)
+### Frontend
+* Next.js 13+
+* React
+* Tailwind CSS
+* scaffold-stark hooks
+* StarkNet.js
 
-```bash
-# Compile the contract
-cd packages/snfoundry/contracts
-scarb build
-# Run the contract test
-scarb test
+## Contributing
 
-# Deploy the contract 
-yarn deploy --network {NETWORK_NAME} //"sepolia" or "mainnet", defaults to "devnet"
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.

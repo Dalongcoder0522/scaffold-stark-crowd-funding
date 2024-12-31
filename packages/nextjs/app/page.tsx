@@ -1,3 +1,17 @@
+/**
+ * Starknet Crowdfunding Frontend
+ * 
+ * This is the main page component for the crowdfunding dApp.
+ * It provides a user interface for:
+ * - Viewing campaign details and progress
+ * - Making donations in ERC20 tokens(Current UI only supports STRK and ETH)
+ * - Managing campaign status (for owners)
+ * - Withdrawing funds (for owners)
+ * 
+ * The component integrates with Starknet smart contracts using scaffold-stark hooks
+ * and handles all necessary token approvals and transactions.
+ */
+
 'use client';
 
 import { ConnectedAddress } from "~~/components/ConnectedAddress";
@@ -6,7 +20,11 @@ import { useState, useMemo, useEffect } from "react";
 import { useScaffoldReadContract, useScaffoldWriteContract, useDeployedContractInfo } from "~~/hooks/scaffold-stark";
 import { useAccount } from "~~/hooks/useAccount";
 
-// 将 felt252 转换为字符串
+/**
+ * Utility function to convert felt252 to readable string
+ * @param felt - The felt252 value to convert
+ * @returns Decoded string from the felt252 value
+ */
 const feltToString = (felt: string) => {
   const hex = BigInt(felt).toString(16);
   const paddedHex = hex.length % 2 ? '0' + hex : hex;
@@ -17,7 +35,12 @@ const feltToString = (felt: string) => {
   return new TextDecoder().decode(new Uint8Array(bytes));
 };
 
-// 格式化 STRK 金额
+/**
+ * Formats token amounts with proper decimal places
+ * @param amount - The amount to format (in wei)
+ * @param decimals - Number of decimal places (default: 18 for most ERC20 tokens)
+ * @returns Formatted string with appropriate decimal places
+ */
 const formatSTRK = (amount: string | undefined, decimals: number = 18): string => {
   if (!amount) return "0";
   const value = BigInt(amount);
@@ -36,7 +59,11 @@ const formatSTRK = (amount: string | undefined, decimals: number = 18): string =
     : integerPart.toString();
 };
 
-// 格式化倒计时
+/**
+ * Formats remaining time into human-readable countdown
+ * @param remainingTime - Time remaining in seconds
+ * @returns Formatted string showing days, hours, minutes, and seconds
+ */
 const formatCountdown = (remainingTime: number): string => {
   if (remainingTime <= 0) return "Ended";
   
@@ -56,98 +83,114 @@ const formatCountdown = (remainingTime: number): string => {
   }
 };
 
-const Home = () => {
-  const [sendValue, setSendValue] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [pendingAmount, setPendingAmount] = useState<bigint | null>(null);
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [remainingTime, setRemainingTime] = useState<number>(0);
-  const { address } = useAccount();
-  
-  // 获取 crowdfunding 合约地址
-  const { data: crowdfundingContract } = useDeployedContractInfo("crowdfunding");
+/**
+ * Format deadline timestamp to human readable date and time
+ * @param timestamp Unix timestamp in seconds
+ * @returns Formatted date string
+ */
+const formatDeadline = (timestamp: string) => {
+  if (!timestamp) return "Loading...";
+  const date = new Date(Number(timestamp) * 1000);
+  return date.toLocaleDateString() + " " + date.toLocaleTimeString();
+};
 
-  // 读取众筹描述
+/**
+ * Main component for the crowdfunding page
+ * Manages campaign state, user interactions, and UI rendering
+ */
+const Home = () => {
+  // Form and UI state management
+  const [sendValue, setSendValue] = useState("");           // Donation amount input
+  const [isLoading, setIsLoading] = useState(false);        // Loading state for transactions
+  const [error, setError] = useState<string | null>(null);  // Error message display
+  const [pendingAmount, setPendingAmount] = useState<bigint | null>(null);  // Amount pending confirmation
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);        // Confirmation dialog visibility
+  const [remainingTime, setRemainingTime] = useState<number>(0);           // Campaign time remaining
+  
+  // User account state
+  const { address } = useAccount();  // Connected wallet address
+
+  // Contract state queries using scaffold-stark hooks
+  const { data: crowdfundingContract } = useDeployedContractInfo("crowdfunding");
   const { data: fundDescription, isLoading: isLoadingDescription } = useScaffoldReadContract({
     contractName: "crowdfunding",
     functionName: "get_fund_description",
   });
 
-  // 获取合约余额
-  const { data: fundBalance, isLoading: isLoadingBalance } = useScaffoldReadContract({
-    contractName: "crowdfunding",
-    functionName: "get_fund_balance",
-  });
-
-  // 获取代币符号
   const { data: tokenSymbol, isLoading: isLoadingSymbol } = useScaffoldReadContract({
     contractName: "crowdfunding",
     functionName: "get_token_symbol",
   });
 
-  // 获取活动状态
-  const { data: isActive } = useScaffoldReadContract({
-    contractName: "crowdfunding",
-    functionName: "get_active",
-  });
-
-  // 动态确定代币合约名称
+  // Memoized token contract name
   const tokenContractName = useMemo(() => {
-    if (!tokenSymbol) return "Strk"; // 默认使用 STRK
+    if (!tokenSymbol) return "Strk"; // Default to STRK
     const symbol = tokenSymbol.toString().toUpperCase();
     if (symbol === "ETH") return "Eth";
     if (symbol === "STRK") return "Strk";
     return "Strk";
   }, [tokenSymbol]) as "Eth" | "Strk";
 
-  // 获取目标金额
+  const { data: fundBalance, isLoading: isLoadingBalance } = useScaffoldReadContract({
+    contractName: "crowdfunding",
+    functionName: "get_fund_balance",
+  });
+
   const { data: fundTarget, isLoading: isLoadingTarget } = useScaffoldReadContract({
     contractName: "crowdfunding",
     functionName: "get_fund_target",
   });
 
-  // 获取截止时间
   const { data: deadline } = useScaffoldReadContract({
     contractName: "crowdfunding",
     functionName: "get_deadline",
   });
 
-  // ERC20 approve
+  const { data: initialOwner } = useScaffoldReadContract({
+    contractName: "crowdfunding",
+    functionName: "get_owner",
+  });
+
+  const { data: isActive } = useScaffoldReadContract({
+    contractName: "crowdfunding",
+    functionName: "get_active",
+  });
+
+  // Contract write functions
   const { sendAsync: approveToken, isPending: isApproving } = useScaffoldWriteContract({
     contractName: tokenContractName,
     functionName: "approve",
-    args:  [crowdfundingContract?.address, 0n] as const
+    args: [crowdfundingContract?.address, 0n] as const
   });
 
-  // 捐赠功能
   const { sendAsync: fundToContract, isPending: isWriteLoading } = useScaffoldWriteContract({
     contractName: "crowdfunding",
     functionName: "fund_to_contract",
     args: [0n] as const
   });
 
-  // 获取合约拥有者
-  const { data: initialOwner } = useScaffoldReadContract({
-    contractName: "crowdfunding",
-    functionName: "get_owner",
-  });
-
-  // 提现功能
   const { sendAsync: withdrawFunds, isPending: isWithdrawing } = useScaffoldWriteContract({
     contractName: "crowdfunding",
     functionName: "withdraw_funds",
   });
 
-  // 激活/停用功能
   const { sendAsync: setActive, isPending: isSettingActive } = useScaffoldWriteContract({
     contractName: "crowdfunding",
     functionName: "set_active",
     args: [true] as const
   });
 
-  // 处理激活状态切换
+  // Memoized computations
+  const isOwner = useMemo(() => {
+    if (!initialOwner || !address) return false;
+    const ownerHex = "0x" + BigInt(initialOwner.toString()).toString(16).padStart(64, '0');
+    const addressHex = address.toLowerCase();
+    return ownerHex.toLowerCase() === addressHex;
+  }, [initialOwner, address]);
+
+  // Transaction handlers
   const handleToggleActive = async () => {
+    // Toggle campaign active status
     try {
       setError(null);
       setIsLoading(true);
@@ -166,65 +209,8 @@ const Home = () => {
     }
   };
 
-  // 转换描述为可读字符串
-  const description = fundDescription ? feltToString(fundDescription.toString()) : "Loading...";
-  
-  // 处理代币符号
-  const symbol = useMemo(() => {
-    if (!tokenSymbol) return "STRK";
-    try {
-      return tokenSymbol.toString().toUpperCase();
-    } catch (error) {
-      console.error("Error parsing token symbol:", error);
-      return "STRK";
-    }
-  }, [tokenSymbol]);
-
-  // 计算进度
-  const progress = fundBalance && fundTarget ?
-    (Number(fundBalance.toString()) / Number(fundTarget.toString())) * 100 : 0;
-
-  // 格式化截止时间
-  const formatDeadline = (timestamp: string) => {
-    if (!timestamp) return "Loading...";
-    const date = new Date(Number(timestamp) * 1000);
-    return date.toLocaleDateString() + " " + date.toLocaleTimeString();
-  };
-
-  // 使用 useMemo 缓存加载状态
-  const isPageLoading = useMemo(() => {
-    // 只在初始加载时显示加载状态
-    if (!crowdfundingContract) return true;
-    
-    // 如果已经有数据，即使在加载中也不显示加载状态
-    if (fundDescription || fundBalance || tokenSymbol || fundTarget) return false;
-    
-    // 否则根据加载状态判断
-    return isLoadingDescription || isLoadingBalance || isLoadingTarget || isLoadingSymbol;
-  }, [
-    crowdfundingContract,
-    fundDescription,
-    fundBalance,
-    tokenSymbol,
-    fundTarget,
-    isLoadingDescription,
-    isLoadingBalance,
-    isLoadingTarget,
-    isLoadingSymbol
-  ]);
-
-  // 检查是否是合约拥有者
-  const isOwner = useMemo(() => {
-    if (!initialOwner || !address) return false;
-    // 将 initialOwner（十进制）转换为 16 进制
-    const ownerHex = "0x" + BigInt(initialOwner.toString()).toString(16).padStart(64, '0');
-    // address 已经是 16 进制，但确保格式统一
-    const addressHex = address.toLowerCase();
-    return ownerHex.toLowerCase() === addressHex;
-  }, [initialOwner, address]);
-
-  // 处理捐赠
   const handleDonate = async () => {
+    // Handle donation flow including validation and token approval
     try {
       setError(null);
       setIsLoading(true);
@@ -303,15 +289,33 @@ const Home = () => {
     }
   };
 
-  // 处理取消
+  const handleWithdraw = async () => {
+    // Process withdrawal for contract owner
+    try {
+      setError(null);
+      setIsLoading(true);
+
+      console.log("Withdrawing funds...");
+      const txHash = await withdrawFunds();
+      if (txHash) {
+        console.log("Withdrawal transaction submitted:", txHash);
+      }
+    } catch (error) {
+      console.error("Error withdrawing:", error);
+      setError(error instanceof Error ? error.message : "Failed to withdraw");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleCancel = () => {
     setShowConfirmDialog(false);
     setPendingAmount(null);
     setIsLoading(false);
   };
 
-  // 处理确认捐赠
   const handleConfirmDonate = async () => {
+    // Confirm donation and execute transaction
     try {
       if (!pendingAmount) return;
       
@@ -350,27 +354,9 @@ const Home = () => {
     }
   };
 
-  // 处理提现
-  const handleWithdraw = async () => {
-    try {
-      setError(null);
-      setIsLoading(true);
-
-      console.log("Withdrawing funds...");
-      const txHash = await withdrawFunds();
-      if (txHash) {
-        console.log("Withdrawal transaction submitted:", txHash);
-      }
-    } catch (error) {
-      console.error("Error withdrawing:", error);
-      setError(error instanceof Error ? error.message : "Failed to withdraw");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // 更新倒计时
+  // Countdown timer effect
   useEffect(() => {
+    // Update remaining time every second
     if (!deadline) return;
 
     const updateCountdown = () => {
@@ -389,18 +375,20 @@ const Home = () => {
     return () => clearInterval(timer);
   }, [deadline]);
 
+  // UI Rendering
   return (
     <div className="bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+      {/* Main layout container with responsive padding */}
       <div className="flex flex-col">
         {/* Hero Section - Top */}
         <div className="flex-shrink-0 px-4 sm:px-6 lg:px-8 py-6">
           <div className="text-center">
             <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 dark:text-white">
               <span className="block text-indigo-600 dark:text-indigo-400">Starknet CrowdFunding</span>
-              <span className="block">{description}</span>
+              <span className="block">{fundDescription ? feltToString(fundDescription.toString()) : "Loading..."}</span>
             </h1>
             <div className="mt-2 text-base text-gray-500 dark:text-gray-400 sm:text-lg">
-              Join us in making a difference. Support this project with {symbol}.
+              Join us in making a difference. Support this project with {tokenSymbol ? tokenSymbol.toString().toUpperCase() : "STRK"}.
             </div>
           </div>
 
@@ -422,7 +410,7 @@ const Home = () => {
         <div className="px-4 sm:px-6 lg:px-8 pb-6">
           {isActive ? (
             <div className="max-w-4xl mx-auto">
-              {isPageLoading ? (
+              {isLoadingDescription || isLoadingBalance || isLoadingTarget || isLoadingSymbol ? (
                 <div className="flex justify-center items-center">
                   <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-indigo-500"></div>
                 </div>
@@ -434,13 +422,13 @@ const Home = () => {
                       {/* Progress Bar */}
                       <div>
                         <div className="flex justify-between mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                          <span>Progress: {progress.toFixed(2)}%</span>
-                          <span>Target: {formatSTRK(fundTarget?.toString())} {symbol}</span>
+                          <span>Progress: {fundBalance && fundTarget ? (Number(fundBalance.toString()) / Number(fundTarget.toString())) * 100 : 0}%</span>
+                          <span>Target: {formatSTRK(fundTarget?.toString())} {tokenSymbol ? tokenSymbol.toString().toUpperCase() : "STRK"}</span>
                         </div>
                         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
                           <div 
                             className="bg-indigo-600 dark:bg-indigo-500 h-3 rounded-full transition-all duration-500 ease-in-out"
-                            style={{ width: `${Math.min(progress, 100)}%` }}
+                            style={{ width: `${Math.min(fundBalance && fundTarget ? (Number(fundBalance.toString()) / Number(fundTarget.toString())) * 100 : 0, 100)}%` }}
                           ></div>
                         </div>
                       </div>
@@ -453,7 +441,7 @@ const Home = () => {
                             <span className="text-2xl font-semibold text-gray-900 dark:text-white">
                               {formatSTRK(fundBalance?.toString())}
                             </span>
-                            <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">{symbol}</span>
+                            <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">{tokenSymbol ? tokenSymbol.toString().toUpperCase() : "STRK"}</span>
                           </div>
                         </div>
                         <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
@@ -486,7 +474,7 @@ const Home = () => {
                           <InputBase
                             value={sendValue}
                             onChange={setSendValue}
-                            placeholder={`Amount to donate (${symbol})`}
+                            placeholder={`Amount to donate (${tokenSymbol ? tokenSymbol.toString().toUpperCase() : "STRK"})`}
                             disabled={isLoading || isWriteLoading || isApproving}
                           />
                           <button
@@ -507,7 +495,7 @@ const Home = () => {
                                 Processing...
                               </span>
                             ) : (
-                              `Donate ${symbol}`
+                              `Donate ${tokenSymbol ? tokenSymbol.toString().toUpperCase() : "STRK"}`
                             )}
                           </button>
                           {error && (
@@ -645,7 +633,7 @@ const Home = () => {
                   </h3>
                   <div className="mt-2">
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Are you sure you want to donate {formatSTRK(pendingAmount.toString())} {symbol}?
+                      Are you sure you want to donate {formatSTRK(pendingAmount.toString())} {tokenSymbol ? tokenSymbol.toString().toUpperCase() : "STRK"}?
                     </p>
                   </div>
                 </div>

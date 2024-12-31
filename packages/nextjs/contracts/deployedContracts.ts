@@ -7,7 +7,7 @@ const deployedContracts = {
   devnet: {
     crowdfunding: {
       address:
-        "0xdce23d8aeae4cab154c1e465f11ac2ad38af49140f899995eaaa75eecd44ab",
+        "0x52918871346ac5de0570a00a0adbcbd2f98594f2db1422c3a4dd2290770a2bc",
       abi: [
         {
           type: "impl",

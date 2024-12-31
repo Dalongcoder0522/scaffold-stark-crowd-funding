@@ -1,53 +1,67 @@
-// CrowdFunding Contract
-// This contract implements a crowdfunding mechanism where users can:
-// 1. Fund the contract with STRK tokens
-// 2. Withdraw funds to a grantee address when target is met or deadline is reached
+// CrowdFunding Smart Contract
+//
+// This contract implements a decentralized crowdfunding platform on StarkNet where:
+// - Users can create and manage fundraising campaigns
+// - Supporters can contribute ERC20 tokens (STRK, ETH, etc.)
+// - Campaign owners can withdraw funds when conditions are met
+// - Campaigns have targets, deadlines, and descriptions
+//
+// Security Features:
+// - Ownable pattern for access control
+// - Deadline enforcement
+// - Active status management
+// - Safe token transfer handling
+
 use starknet::ContractAddress;
+
 #[starknet::interface]
 pub trait IFund<TContractState> {
-    // Returns the current balance of the crowdfunding contract
+    // Returns the current balance of tokens held by the crowdfunding contract
     fn get_fund_balance(self: @TContractState) -> u256;
 
-    // Returns the funding target amount
+    // Returns the target amount that needs to be raised for the campaign
     fn get_fund_target(self: @TContractState) -> u256;
 
-    // Returns the description of the crowdfunding campaign
+    // Returns the campaign description stored as a felt252
     fn get_fund_description(self: @TContractState) -> felt252;
 
-    // Returns the campaign deadline timestamp
+    // Returns the Unix timestamp when the campaign ends
     fn get_deadline(self: @TContractState) -> felt252;
 
-    // Returns the token symbol
+    // Returns the symbol of the ERC20 token being used (e.g., "STRK", "ETH")
     fn get_token_symbol(self: @TContractState) -> core::byte_array::ByteArray;
 
-    // Returns the token address
+    // Returns the contract address of the ERC20 token being used for fundraising
     fn get_token_address(self: @TContractState) -> ContractAddress;
 
-    // Allows users to fund the contract with STRK tokens
+    // Allows supporters to contribute tokens to the campaign
+    // Requires prior approval for token transfer
     fn fund_to_contract(ref self: TContractState, amount: u256);
 
-    // Withdraws all funds to the grantee
+    // Allows the campaign owner to withdraw collected funds
+    // Only succeeds if deadline is reached or target is met
     fn withdraw_funds(ref self: TContractState);
 
-    // reset funding for another patron
+    // Resets the campaign with new parameters for another fundraising round
+    // Only callable by contract owner
     fn reset_fund(ref self: TContractState,
-        token: ContractAddress,
-        grantee_address: ContractAddress,
-        fund_target: u256,
-        fund_description: felt252,
-        deadline: felt252,
-        initial_owner: ContractAddress);
+        token: ContractAddress,          // New token contract address
+        grantee_address: ContractAddress, // New beneficiary address
+        fund_target: u256,               // New funding target
+        fund_description: felt252,        // New campaign description
+        deadline: felt252,                // New deadline timestamp
+        initial_owner: ContractAddress    // New campaign owner
+    );
 
-    // Returns the contract owner
+    // Returns the address of the contract owner
     fn get_owner(self: @TContractState) -> ContractAddress;
 
-    // 获取活动状态
+    // Returns whether the campaign is currently active
     fn get_active(self: @TContractState) -> bool;
 
-    // 设置活动状态（只有所有者可以调用）
+    // Allows owner to pause/unpause the campaign
     fn set_active(ref self: TContractState, new_active: bool);
 }
-
 
 #[starknet::contract]
 pub mod crowdfunding {
@@ -66,30 +80,32 @@ pub mod crowdfunding {
     impl OwnableMixinImpl = OwnableComponent::OwnableMixinImpl<ContractState>;
     impl OwnableInternalImpl = OwnableComponent::InternalImpl<ContractState>;
 
-    // Contract storage structure
+    // Contract Storage Structure
+    // Each field represents a critical piece of campaign information
     #[storage]
     struct Storage {
-        token: ContractAddress,     //fund token address
-        fund_target: u256,           // Target amount to raise
-        grantee_address: ContractAddress, // Beneficiary address
-        fund_description: felt252,     // Campaign description (English only)
-        deadline: felt252,              // Campaign end timestamp Unix timestamp 1740805200(2025年3月1日00:00:00) https://tool.chinaz.com/tools/unixtime.aspx
+        token: ContractAddress,           // Address of ERC20 token used for fundraising
+        fund_target: u256,               // Total amount needed to be raised
+        grantee_address: ContractAddress, // Address that will receive the funds
+        fund_description: felt252,        // Campaign details (English text)
+        deadline: felt252,                // Campaign end time (Unix timestamp)
         #[substorage(v0)]
-        ownable: OwnableComponent::Storage,
-        active: bool,               // Campaign active status
+        ownable: OwnableComponent::Storage, // Access control component
+        active: bool,                     // Campaign status flag
     }
 
-    // Event definitions
+    // Event Definitions
+    // These events are emitted to track important contract state changes
     #[event]
     #[derive(Drop, starknet::Event)]
     enum Event {
         #[flat]
-        OwnableEvent: OwnableComponent::Event,
-        SelfDestructed: SelfDestructed,
-        Transfer: Transfer,
-        TransferFailed: TransferFailed,
-        ResetFund: ResetFund,
-        ActiveChanged: ActiveChanged,
+        OwnableEvent: OwnableComponent::Event,  // Ownership transfer events
+        SelfDestructed: SelfDestructed,         // Contract destruction event
+        Transfer: Transfer,                      // Successful token transfer
+        TransferFailed: TransferFailed,         // Failed token transfer
+        ResetFund: ResetFund,                   // Campaign reset
+        ActiveChanged: ActiveChanged,            // Status change
     }
 
     #[derive(Drop, starknet::Event)]
@@ -128,16 +144,17 @@ pub mod crowdfunding {
         active: bool,
     }
 
-    // Contract constructor
+    // Constructor: Initializes a new crowdfunding campaign
+    // Sets up initial parameters and activates the campaign
     #[constructor]
     fn constructor(
         ref self: ContractState,
-        token: ContractAddress,
-        grantee_address: ContractAddress,
-        fund_target: u256,
-        fund_description: felt252,
-        deadline: felt252,
-        initial_owner: ContractAddress
+        token: ContractAddress,           // ERC20 token address (default: STRK)
+        grantee_address: ContractAddress, // Beneficiary who receives funds
+        fund_target: u256,               // Campaign goal amount
+        fund_description: felt252,        // Campaign description
+        deadline: felt252,                // End timestamp
+        initial_owner: ContractAddress    // Campaign administrator
     ) {
         //fund token address,support any ERC20 token, if not pass token ,use STRK address 0x04718f5a0Fc34cC1AF16A1cdee98fFB20C31f5cD61D6Ab07201858f4287c938D
         self.token.write(token);
@@ -152,7 +169,8 @@ pub mod crowdfunding {
 
     #[abi(embed_v0)]
     impl CrowdFundingImpl of super::IFund<ContractState> {
-        // Allows users to donate STRK tokens to the contract
+        // Processes a new contribution to the campaign
+        // Validates the transaction and transfers tokens from contributor
         fn fund_to_contract(ref self: ContractState, amount: u256) {
             println!("amount: {}", amount);
             let caller_address = get_caller_address();
@@ -216,8 +234,8 @@ pub mod crowdfunding {
             }
         }
 
-        // Withdraws funds to grantee
-        // Can only be called by contract owner when deadline is reached or target is met
+        // Processes withdrawal of funds to the grantee
+        // Checks campaign conditions and transfers total balance
         fn withdraw_funds(ref self: ContractState) {
             self.ownable.assert_only_owner();
             assert(self.active.read(), 'Not active status');
@@ -337,12 +355,12 @@ pub mod crowdfunding {
 
         //Reset the contract and start a new crowdfunding
         fn reset_fund(ref self: ContractState,
-            token: ContractAddress,
-            grantee_address: ContractAddress,
-            fund_target: u256,
-            fund_description: felt252,
-            deadline: felt252,
-            initial_owner: ContractAddress
+            token: ContractAddress,          // New token contract address
+            grantee_address: ContractAddress, // New beneficiary address
+            fund_target: u256,               // New funding target
+            fund_description: felt252,        // New campaign description
+            deadline: felt252,                // New deadline timestamp
+            initial_owner: ContractAddress    // New campaign owner
         ) {
             self.ownable.assert_only_owner();
             // Reset contract after withdraw
