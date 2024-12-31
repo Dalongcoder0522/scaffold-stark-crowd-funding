@@ -10,6 +10,40 @@ A decentralized crowdfunding platform built on StarkNet, enabling users to creat
 * Deadline-based campaign management
 * Flexible campaign reset functionality
 * Transparent fund tracking and withdrawal system
+* Role-based access control system
+
+### Access Control System
+
+The platform implements a robust role-based access control system:
+
+#### Admin/Owner Privileges
+* Toggle campaign active status (activate/deactivate)
+* Withdraw funds when conditions are met
+* Reset campaign with new parameters
+* View special owner-only UI controls
+* Manage campaign core parameters
+
+#### User Permissions
+* View campaign details and progress
+* Make donations to active campaigns
+* View their donation history
+* Connect/disconnect wallet
+
+#### Campaign State Restrictions
+* Donations only accepted when campaign is active
+* Withdrawals only allowed when:
+  - Campaign deadline has passed, OR
+  - Funding target has been reached
+* Campaign reset only possible after:
+  - All funds have been withdrawn
+  - Previous campaign is completed
+
+#### Smart Contract Validations
+* Owner-only function access
+* Active status checks
+* Deadline enforcement
+* Balance verification
+* Token approval validation
 
 ### Frontend Interface
 * Modern, responsive UI built with Next.js and Tailwind CSS
@@ -132,10 +166,15 @@ The contract emits the following events:
 ## Security Considerations
 
 * Owner-only access control for sensitive functions
+  - Withdrawal restrictions
+  - Campaign state management
+  - Parameter updates
 * Deadline enforcement for campaign lifecycle
 * Safe token transfer handling
 * Input validation for all user interactions
 * Proper error handling and event emission
+* Role-based UI element visibility
+* Transaction confirmation dialogs for important actions
 
 ## Dependencies
 
