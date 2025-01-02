@@ -67,6 +67,7 @@ const declareIfNot_NotWait = async (
   } catch (error) {
     try {
       const isSierraContract = isSierra(payload.contract);
+      console.log('networkName: {}',networkName);
       const txVersion = await getTxVersion(
         networks[networkName],
         feeToken,

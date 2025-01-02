@@ -68,9 +68,9 @@ pub mod crowdfunding {
     use starknet::ContractAddress;
     use starknet::event::EventEmitter;
     use starknet::get_caller_address;
-    use openzeppelin::access::ownable::{OwnableComponent};
-    use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
-    use openzeppelin::token::erc20::interface::{IERC20MetadataDispatcher, IERC20MetadataDispatcherTrait};
+    use openzeppelin_access::ownable::{OwnableComponent};
+    use openzeppelin_token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
+    use openzeppelin_token::erc20::interface::{IERC20MetadataDispatcher, IERC20MetadataDispatcherTrait};
     use core::traits::TryInto;
 
     // Ownable component integration

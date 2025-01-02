@@ -2,10 +2,8 @@ import {
   deployContract,
   executeDeployCalls,
   exportDeployments,
-  deployer,
 } from "./deploy-contract";
 import { green } from "./helpers/colorize-log";
-
 /**
  * Deploy a contract using the specified parameters.
  *
@@ -44,6 +42,7 @@ import { green } from "./helpers/colorize-log";
 const deployScript = async (): Promise<void> => {
   await deployContract({
     contract: "crowdfunding",
+    contractName: "crowdfunding",
     constructorArgs: {
       token: process.env.STRK_SEPOLIA_ADDRESS ?? "",
       grantee_address: process.env.GRANTEE_ADDRESS ?? "",
@@ -52,6 +51,9 @@ const deployScript = async (): Promise<void> => {
       deadline: process.env.DEADLINE ?? "",
       initial_owner: process.env.ACCOUNT_ADDRESS_SEPOLIA ?? "",
     },
+/*    options: {
+      maxFee: BigInt("1000000000000000000000000000000")
+    }*/
   });
 };
 
