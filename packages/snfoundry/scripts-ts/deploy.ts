@@ -2,6 +2,7 @@ import {
   deployContract,
   executeDeployCalls,
   exportDeployments,
+  deployer,
 } from "./deploy-contract";
 import { green } from "./helpers/colorize-log";
 /**
@@ -44,12 +45,12 @@ const deployScript = async (): Promise<void> => {
     contract: "crowdfunding",
     contractName: "crowdfunding",
     constructorArgs: {
-      token: process.env.STRK_SEPOLIA_ADDRESS ?? "",
-      grantee_address: process.env.GRANTEE_ADDRESS ?? "",
-      fund_target: process.env.FUND_TARGET ?? "",
-      fund_description: process.env.FUND_DESCRIPTION ?? "",
-      deadline: process.env.DEADLINE ?? "",
-      initial_owner: process.env.ACCOUNT_ADDRESS_SEPOLIA ?? "",
+      token: process.env.STRK_SEPOLIA_ADDRESS,
+      grantee_address: process.env.GRANTEE_ADDRESS,
+      fund_target: BigInt(process.env.FUND_TARGET ?? "100000000000000000000"),
+      fund_description: process.env.FUND_DESCRIPTION,
+      deadline: process.env.DEADLINE ?? "1767151217",
+      initial_owner: deployer.address,
     },
 /*    options: {
       maxFee: BigInt("1000000000000000000000000000000")
