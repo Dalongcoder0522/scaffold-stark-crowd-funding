@@ -475,18 +475,18 @@ const Home = () => {
                             value={sendValue}
                             onChange={setSendValue}
                             placeholder={`Amount to donate (${tokenSymbol ? tokenSymbol.toString().toUpperCase() : "STRK"})`}
-                            disabled={isLoading || isWriteLoading || isApproving}
+                            disabled={isLoading || isApproving}
                           />
                           <button
                             className={`w-full px-4 py-3 rounded-md text-white font-medium ${
-                              isLoading || isWriteLoading || isApproving || !sendValue
+                              isLoading || isApproving || !sendValue
                                 ? 'bg-gray-400 cursor-not-allowed'
                                 : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
                             } transition-all duration-200`}
                             onClick={handleDonate}
-                            disabled={isLoading || isWriteLoading || isApproving || !sendValue}
+                            disabled={isLoading || isApproving || !sendValue}
                           >
-                            {isLoading || isWriteLoading || isApproving ? (
+                            {isLoading || isApproving ? (
                               <span className="flex items-center justify-center">
                                 <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
