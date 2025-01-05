@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
+import webpack from "webpack";
+
 const nextConfig = {
   reactStrictMode: true,
   images: {
@@ -62,6 +64,11 @@ const nextConfig = {
       });
     }
     config.externals.push("pino-pretty", "lokijs", "encoding");
+    config.plugins.push(
+      new webpack.NormalModuleReplacementPlugin(/^node:(.*)$/, (resource) => {
+        resource.request = resource.request.replace(/^node:/, "");
+      }),
+    );
     return config;
   },
 };
