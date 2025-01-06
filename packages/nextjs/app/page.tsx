@@ -159,7 +159,7 @@ const Home = () => {
   // Contract write functions
   const { sendAsync: approveToken, isPending: isApproving } = useScaffoldWriteContract({
     contractName: tokenContractName,
-    functionName: "approve",
+    functionName: "transfer",
     args: [crowdfundingContract?.address, 0n] as const
   });
 
@@ -267,12 +267,12 @@ const Home = () => {
         console.log("Token approved:", approveTx);
 
         // 然后调用 fund_to_contract
-        console.log("Donating...");
-        const txHash = await fundToContract({ args: [amount] });
-        if (txHash) {
-          console.log("Transaction submitted:", txHash);
-          setSendValue("");
-        }
+        // console.log("Donating...");
+        // const txHash = await fundToContract({ args: [amount] });
+        // if (txHash) {
+        //   console.log("Transaction submitted:", txHash);
+        //   setSendValue("");
+        // }
       } catch (error) {
         console.error("Error in transaction:", error);
         setError(error instanceof Error ? error.message : "Transaction failed");
@@ -336,12 +336,12 @@ const Home = () => {
         console.log("Token approved:", approveTx);
 
         // 然后调用 fund_to_contract
-        console.log("Donating...");
-        const txHash = await fundToContract({ args: [amount] });
-        if (txHash) {
-          console.log("Transaction submitted:", txHash);
-          setSendValue("");
-        }
+        // console.log("Donating...");
+        // const txHash = await fundToContract({ args: [amount] });
+        // if (txHash) {
+        //   console.log("Transaction submitted:", txHash);
+        //   setSendValue("");
+        // }
       } catch (error) {
         console.error("Error in transaction:", error);
         setError(error instanceof Error ? error.message : "Transaction failed");
