@@ -197,3 +197,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## demo video and Sepolia environment
+demo video https://youtu.be/shciV6KVuyQ
+Sepolia environment https://scaffold-stark-crowd-funding-nextjs.vercel.app/
